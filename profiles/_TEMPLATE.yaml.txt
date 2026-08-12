@@ -1,0 +1,79 @@
+# =============================================================================
+# แม่แบบ profile สำหรับกลุ่มอายุใหม่
+#
+# วิธีใช้: คัดลอกไฟล์นี้ -> เปลี่ยนชื่อเป็น <ชื่อกลุ่ม>.yaml -> แก้เนื้อหา
+#          สร้างโฟลเดอร์ data/<data_folder>/ แล้ววางไฟล์ .xlsx
+#          เปิดโปรแกรม -> กลุ่มอายุใหม่จะขึ้นในเมนูอัตโนมัติ (ไม่ต้อง build exe ใหม่)
+# =============================================================================
+
+id: "0-5y"                       # รหัสไม่ซ้ำ
+label: "เด็กก่อนวัยเรียน 0-5 ปี"   # ชื่อที่แสดงในเมนู
+data_folder: "0-5y"              # โฟลเดอร์ย่อยใน data/
+age_range: [0, 5]                # ช่วงอายุ (ปี) ที่นับเข้ารายงาน
+
+row_filter: null                 # เงื่อนไขกรองแถวเพิ่มเติม เช่น "denttype == '2'"
+
+# เงื่อนไข "ผ่านเกณฑ์คุณภาพ" — ของ 0-5 ปีใช้ฟันน้ำนม จึงเป็น dteeth ไม่ใช่ pteeth
+quality_filter: "providertype in ['02','06'] and dteeth > 0"
+
+quality_checks:
+  - name: "provider_type in (02,06)"
+    expr: "providertype in ['02','06']"
+  - name: "DTEETH > 0"
+    expr: "dteeth > 0"
+
+tables:
+  - "no": "1"
+    title: "ข้อมูลคุณภาพของข้อมูลการตรวจ"
+    kind: quality               # quality | count_pct | mean
+    rows: age                   # age = แยกรายอายุ
+
+  - "no": "2"
+    title: "ร้อยละของผู้ปราศจากโรคฟันผุในฟันน้ำนม"
+    kind: count_pct
+    rows: age
+    denominator: qualified      # qualified | examined | <expression>
+    conditions:
+      - "ปราศจากฟันผุ = dcaries + dfilling + dextract = 0"
+    metrics:
+      - name: "ปราศจากฟันผุ"
+        expr: "dcaries + dfilling + dextract == 0"
+      - name: "มีประสบการณ์ฟันผุ"
+        expr: "dcaries + dfilling + dextract > 0"
+
+  - "no": "3"
+    title: "ค่าเฉลี่ยฟันผุถอนอุด ฟันน้ำนม (ซี่ต่อคน)"
+    kind: mean
+    rows: age
+    denominator: qualified
+    metrics:
+      - name: "ฟันที่มีในปาก"
+        expr: "dteeth"
+      - name: "ฟันผุ"
+        expr: "dcaries"
+      - name: "ฟันผุถอนอุด (dmft)"
+        expr: "dcaries + dfilling + dextract"
+
+# -----------------------------------------------------------------------------
+# ตัวแปรที่ใช้ใน expr ได้
+# -----------------------------------------------------------------------------
+# คอลัมน์ต้นฉบับทั้งหมด (ตัวพิมพ์เล็ก): hoscode, pid, sex, birth, date_serv,
+#   denttype, servplace, pteeth, pcaries, pfilling, pextract,
+#   dteeth, dcaries, dfilling, dextract, need_fluoride, need_scaling,
+#   need_sealant, need_pfilling, need_dfilling, need_pextract, need_dextract,
+#   nprosthesis, gum, schooltype, class, provider, providertype
+#
+# คอลัมน์ที่โปรแกรมคำนวณให้:
+#   age          อายุเป็นปี (date_serv - birth)
+#   age_month    อายุเป็นเดือน
+#   examined     True ถ้า date_serv ไม่ว่าง
+#   gum_status   '0'/'1'/'2'/'3'/'9'  (ค่าสูงสุดของ sextant ที่ตรวจได้)
+#   gum_sx_0..9  จำนวน sextant ที่มีค่านั้น (0-6)
+#   dmft_p       pcaries + pfilling + pextract   (ฟันแท้)
+#   dmft_d       dcaries + dfilling + dextract   (ฟันน้ำนม)
+#   pvname, ampname, hosname  จาก reference/hospitals.csv
+#
+# ไวยากรณ์ expr = pandas.eval  เช่น
+#   "pcaries > 0"                          "providertype in ['02','06']"
+#   "need_pfilling > 0 or need_dfilling > 0"
+#   "gum_status == '3'"                    "pcaries + pfilling + pextract == 0"

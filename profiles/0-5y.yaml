@@ -1,0 +1,126 @@
+# =============================================================================
+# Profile: เด็กก่อนวัยเรียน 0-5 ปี  (นับฟันน้ำนม)
+# อ้างอิง: ตารางรายงานและเงื่อนไขการคำนวณ0-5.docx
+# แก้ไขไฟล์นี้ได้โดยตรง ไม่ต้อง build exe ใหม่
+# =============================================================================
+id: "0-5y"
+label: "เด็กก่อนวัยเรียน 0-5 ปี"
+data_folder: "0-5y"
+age_range: [0, 5]
+
+# ตารางของกลุ่มนี้แยกแถวเป็นช่วงอายุ ไม่ใช่รายปี
+bands:
+  - {label: "0-2", min: 0, max: 2}
+  - {label: "3-5", min: 3, max: 5}
+
+row_filter: null
+
+# เงื่อนไขผ่านเกณฑ์คุณภาพ (ใช้กับทุกช่วงอายุ)
+quality_filter: >-
+  providertype in ['02','06']
+  and dteeth >= 1 and dteeth <= 20
+  and dcaries + dfilling + dextract <= 20
+
+# เงื่อนไขเพิ่มเติมเฉพาะบางช่วงอายุ
+# เอกสารเขียนว่า "dteeth+dextract = 20 (สำหรับ 0-2 ปี)" แต่ตกลงใช้กับ 3-5 ปี
+# เพราะฟันน้ำนมครบ 20 ซี่ตอนอายุประมาณ 3 ขวบ (ถ้าใช้กับ 0-2 จะตัดเด็กออก 66%)
+#   >> เปลี่ยนช่วงที่ใช้: แก้ key "3-5"   |   ไม่ใช้เลย: ลบ 2 บรรทัดล่างนี้ทิ้ง
+quality_extra:
+  "3-5": "dteeth + dextract == 20"
+
+# ตัวชี้วัดของแถบสรุปรายอำเภอ — กลุ่มนี้ใช้ฟันน้ำนม
+overview:
+  caries_free: "dcaries + dfilling + dextract == 0"
+  dmft: "dcaries + dfilling + dextract"
+  caries_free_label: "ปราศจากฟันผุ (ฟันน้ำนม)"
+  dmft_label: "dmft เฉลี่ย"
+
+quality_checks:
+  - name: "provider_type in (02,06)"
+    expr: "providertype in ['02','06']"
+  - name: "dteeth between 1-20"
+    expr: "dteeth >= 1 and dteeth <= 20"
+  - name: "dcaries+dfilling+dextract <= 20"
+    expr: "dcaries + dfilling + dextract <= 20"
+  - name: "dteeth+dextract = 20 (เฉพาะ 3-5 ปี)"
+    expr: "dteeth + dextract == 20"
+    bands: ["3-5"]          # นับเฉพาะแถวในช่วงนี้
+
+tables:
+  # ---------------------------------------------------------------------------
+  - "no": "1"
+    title: "ข้อมูลคุณภาพของข้อมูลการตรวจแยกรายกลุ่มอายุ"
+    kind: quality
+    rows: bands
+    conditions:
+      - "จำนวนที่ตรวจ (ได้รับการตรวจฟัน) คือ date_serv ไม่เป็นค่าว่าง"
+      - "ผ่านเกณฑ์คุณภาพ = ตรวจฟัน และ provider_type in (02,06) และ dteeth 1-20 และ dcaries+dfilling+dextract ≤ 20"
+      - "เพิ่มเติมสำหรับ 3-5 ปี: dteeth + dextract = 20 (ฟันน้ำนมครบ 20 ซี่)"
+
+  # ---------------------------------------------------------------------------
+  - "no": "2"
+    title: "ร้อยละของผู้ปราศจากโรคฟันผุและมีประสบการณ์ฟันผุ (ฟันน้ำนม)"
+    kind: count_pct
+    rows: bands
+    denominator: qualified
+    conditions:
+      - "ปราศจากฟันผุ = dcaries + dfilling + dextract = 0"
+      - "ฟันดีไม่มีผุ = dcaries + dextract = 0"
+      - "ฟันผุไม่ได้รักษา = dcaries > 0 | ฟันถอน = dextract > 0 | ฟันอุด = dfilling > 0"
+      - "ฟันผุถอนอุด = dcaries + dfilling + dextract > 0"
+    metrics:
+      - name: "ปราศจากฟันผุ"
+        expr: "dcaries + dfilling + dextract == 0"
+      - name: "ฟันดีไม่มีผุ"
+        expr: "dcaries + dextract == 0"
+      - name: "ฟันผุไม่ได้รักษา"
+        expr: "dcaries > 0"
+      - name: "ฟันถอน"
+        expr: "dextract > 0"
+      - name: "ฟันอุด"
+        expr: "dfilling > 0"
+      - name: "ฟันผุถอนอุด"
+        expr: "dcaries + dfilling + dextract > 0"
+
+  # ---------------------------------------------------------------------------
+  - "no": "3"
+    title: "ค่าเฉลี่ยฟันผุถอนอุดในกลุ่มอายุต่างๆ (ซี่ต่อคน, ฟันน้ำนม)"
+    kind: mean
+    rows: bands
+    denominator: qualified
+    conditions:
+      - "ฟันที่มีในปาก = dteeth"
+      - "ค่าเฉลี่ยแต่ละช่อง = ผลรวมของช่องนั้น ÷ จำนวนคนที่ตรวจผ่านเกณฑ์คุณภาพ"
+    metrics:
+      - name: "ฟันที่มีในปาก"
+        expr: "dteeth"
+      - name: "ฟันผุ"
+        expr: "dcaries"
+      - name: "ฟันถอน"
+        expr: "dextract"
+      - name: "ฟันอุด"
+        expr: "dfilling"
+      - name: "ฟันผุถอนอุด"
+        expr: "dcaries + dfilling + dextract"
+
+  # ---------------------------------------------------------------------------
+  - "no": "7"
+    title: "ความจำเป็นในการรักษา"
+    kind: count_pct
+    rows: bands
+    denominator: qualified
+    conditions:
+      - "ทาฟลูออไรด์ = need_fluoride = 1 | ขูดหินปูน = need_scaling = 1"
+      - "เคลือบหลุมร่องฟัน = need_sealant > 0"
+      - "อุดฟัน = need_dfilling > 0 | ถอนฟัน/รักษารากฟัน = need_dextract > 0"
+    metrics:
+      - name: "ทาฟลูออไรด์"
+        expr: "need_fluoride == 1"
+      - name: "เคลือบหลุมร่องฟัน"
+        expr: "need_sealant > 0"
+      - name: "อุดฟัน"
+        expr: "need_dfilling > 0"
+      - name: "ถอนฟัน/รักษารากฟัน"
+        expr: "need_dextract > 0"
+      - name: "ขูดหินปูน"
+        expr: "need_scaling == 1"

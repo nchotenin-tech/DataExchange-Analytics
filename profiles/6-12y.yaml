@@ -1,0 +1,141 @@
+# =============================================================================
+# Profile: เด็กวัยเรียน 6-12 ปี
+# แก้ไขไฟล์นี้ได้โดยตรง ไม่ต้อง build exe ใหม่
+# =============================================================================
+id: "6-12y"
+label: "เด็กวัยเรียน 6-12 ปี"
+data_folder: "6-12y"          # โฟลเดอร์ย่อยใน data/
+age_range: [6, 12]
+
+# เงื่อนไข "จำนวนที่ตรวจ" = date_serv ไม่เป็นค่าว่าง (จัดการโดย engine อัตโนมัติ)
+# row_filter: เงื่อนไขเพิ่มเติมเฉพาะกลุ่มนี้ (เว้นว่างได้)
+row_filter: null
+
+# เงื่อนไข "ผ่านเกณฑ์คุณภาพ"
+quality_filter: "providertype in ['02','06'] and pteeth > 0"
+
+# แยกสาเหตุที่ไม่ผ่านเกณฑ์ (ใช้ในตารางที่ 1)
+quality_checks:
+  - name: "provider_type in (02,06)"
+    expr: "providertype in ['02','06']"
+  - name: "PTEETH > 0"
+    expr: "pteeth > 0"
+
+tables:
+  # ---------------------------------------------------------------------------
+  - "no": "1"
+    title: "ข้อมูลคุณภาพของข้อมูลการตรวจแยกรายกลุ่มอายุ"
+    kind: quality
+    rows: age
+    conditions:
+      - "จำนวนที่ตรวจ (ได้รับการตรวจฟัน) คือ date_serv ไม่เป็นค่าว่าง"
+      - "ผ่านเกณฑ์คุณภาพ = ได้รับการตรวจฟัน และ provider_type in (02,06) และ PTEETH > 0"
+
+  # ---------------------------------------------------------------------------
+  - "no": "2"
+    title: "ร้อยละของผู้ปราศจากโรคฟันผุและมีประสบการณ์ฟันผุ"
+    kind: count_pct
+    rows: age
+    denominator: qualified
+    conditions:
+      - "ปราศจากฟันผุ = pcaries + pfilling + pextract = 0"
+      - "ฟันดีไม่มีผุ = pcaries + pextract = 0"
+      - "ฟันผุไม่ได้รักษา = pcaries > 0 | ฟันถอน = pextract > 0 | ฟันอุด = pfilling > 0"
+      - "ฟันผุถอนอุด = pcaries + pfilling + pextract > 0"
+    metrics:
+      - name: "ปราศจากฟันผุ"
+        expr: "pcaries + pfilling + pextract == 0"
+      - name: "ฟันดีไม่มีผุ"
+        expr: "pcaries + pextract == 0"
+      - name: "ฟันผุไม่ได้รักษา"
+        expr: "pcaries > 0"
+      - name: "ฟันถอน"
+        expr: "pextract > 0"
+      - name: "ฟันอุด"
+        expr: "pfilling > 0"
+      - name: "ฟันผุถอนอุด"
+        expr: "pcaries + pfilling + pextract > 0"
+
+  # ---------------------------------------------------------------------------
+  - "no": "3"
+    title: "ค่าเฉลี่ยฟันผุถอนอุดในกลุ่มอายุต่างๆ (ซี่ต่อคน)"
+    kind: mean
+    rows: age
+    denominator: qualified
+    conditions:
+      - "หารด้วยจำนวนคนที่ตรวจผ่านเกณฑ์คุณภาพ"
+    metrics:
+      - name: "ฟันที่มีในปาก"
+        expr: "pteeth"
+      - name: "ฟันผุ"
+        expr: "pcaries"
+      - name: "ฟันถอน"
+        expr: "pextract"
+      - name: "ฟันอุด"
+        expr: "pfilling"
+      - name: "ฟันผุถอนอุด"
+        expr: "pcaries + pfilling + pextract"
+
+  # ---------------------------------------------------------------------------
+  - "no": "4"
+    title: "ร้อยละของผู้มีภาวะเหงือกอักเสบและสภาวะปริทันต์"
+    kind: count_pct
+    rows: age
+    denominator: qualified
+    conditions:
+      - "GUM = 6 sextant รูปแบบ XXXXXX แต่ละ X in (0,1,2,3,9)"
+      - "gum_status = 9 ถ้า GUM = 999999 มิฉะนั้นใช้ค่าสูงสุดของ sextant ที่ตรวจได้ (0,1,2,3)"
+    metrics:
+      - name: "ปกติ"
+        expr: "gum_status == '0'"
+      - name: "เลือดออก"
+        expr: "gum_status == '1'"
+      - name: "เหงือกอักเสบ"
+        expr: "gum_status == '2'"
+      - name: "ปริทันต์"
+        expr: "gum_status == '3'"
+      - name: "ตรวจไม่ได้"
+        expr: "gum_status == '9'"
+
+  # ---------------------------------------------------------------------------
+  - "no": "5"
+    title: "ค่าเฉลี่ย sextant ที่มีเหงือกอักเสบและสภาวะปริทันต์"
+    kind: mean
+    rows: age
+    denominator: qualified
+    conditions:
+      - "1 คนมี 6 sextant นับจำนวน sextant ตามค่าเหงือก แล้วเฉลี่ยต่อคน"
+    metrics:
+      - name: "ปกติ"
+        expr: "gum_sx_0"
+      - name: "เลือดออก"
+        expr: "gum_sx_1"
+      - name: "เหงือกอักเสบ"
+        expr: "gum_sx_2"
+      - name: "ปริทันต์"
+        expr: "gum_sx_3"
+      - name: "ตรวจไม่ได้"
+        expr: "gum_sx_9"
+
+  # ---------------------------------------------------------------------------
+  - "no": "6"
+    title: "ความจำเป็นในการรักษา"
+    kind: count_pct
+    rows: age
+    denominator: qualified
+    conditions:
+      - "ทาฟลูออไรด์ = need_fluoride = 1 | ขูดหินปูน = need_scaling = 1"
+      - "เคลือบหลุมร่องฟัน = need_sealant > 0"
+      - "อุดฟัน = need_pfilling > 0 หรือ need_dfilling > 0"
+      - "ถอนฟัน/รักษารากฟัน = need_pextract > 0 หรือ need_dextract > 0"
+    metrics:
+      - name: "ทาฟลูออไรด์"
+        expr: "need_fluoride == 1"
+      - name: "เคลือบหลุมร่องฟัน"
+        expr: "need_sealant > 0"
+      - name: "อุดฟัน"
+        expr: "need_pfilling > 0 or need_dfilling > 0"
+      - name: "ถอนฟัน/รักษารากฟัน"
+        expr: "need_pextract > 0 or need_dextract > 0"
+      - name: "ขูดหินปูน"
+        expr: "need_scaling == 1"

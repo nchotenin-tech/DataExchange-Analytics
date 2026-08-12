@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DentalDX — วิเคราะห์ข้อมูล Data Exchange ทันตสุขภาพ</title>
+<style>
+:root{
+  --bg:#eef5fb; --panel:#fff; --ink:#17364f; --ink2:#3d5f7d; --muted:#7c96ad; --line:#e2eef8;
+  --sky:#2f9fdc; --mint:#1cbfa0; --sun:#f5a623; --coral:#fb7185; --lav:#8e86ee;
+  --r:16px; --r2:10px; --sh:0 1px 2px rgba(23,54,79,.05), 0 6px 18px rgba(23,54,79,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:"Sarabun","Leelawadee UI","Noto Sans Thai",Tahoma,"Segoe UI",system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6}
+.app{display:flex;min-height:100vh}
+
+/* ---------- sidebar ---------- */
+aside{width:272px;flex:0 0 272px;position:fixed;inset:0 auto 0 0;overflow-y:auto;z-index:60;
+  background:linear-gradient(170deg,#0d4d8c 0%,#1b5fbe 40%,#4331a8 100%);
+  color:#fff;padding:20px 16px 28px;box-shadow:2px 0 18px rgba(13,45,90,.22)}
+.brand{display:flex;gap:11px;align-items:center;padding-bottom:15px;margin-bottom:12px;
+  border-bottom:1px solid rgba(255,255,255,.28)}
+.brand .logo{width:46px;height:46px;flex:0 0 46px;border-radius:14px;overflow:hidden;
+  box-shadow:0 3px 10px rgba(0,0,0,.22)}
+.brand .logo svg{width:100%;height:100%;display:block}
+.brand b{display:block;font-size:15.5px;line-height:1.25;letter-spacing:.01em}
+.brand span{font-size:11.5px;color:#bcd8f7}
+
+aside label{display:block;font-size:11.5px;color:#c9e0fa;font-weight:600;
+  margin:15px 0 6px;letter-spacing:.03em}
+aside select{width:100%;font-family:inherit;font-size:13.5px;font-weight:500;
+  padding:10px 12px;border-radius:var(--r2);border:1px solid rgba(255,255,255,.35);
+  background:#fff;color:#17364f;outline:none;cursor:pointer;
+  box-shadow:0 2px 6px rgba(6,32,66,.18)}
+aside select:hover{border-color:#fff}
+aside select:focus{border-color:#ffd166;box-shadow:0 0 0 3px rgba(255,209,102,.35)}
+aside select option{color:#17364f}
+
+aside button#btnRefresh{width:100%;font-family:inherit;font-size:13.5px;font-weight:700;
+  padding:11px 12px;margin-top:20px;border-radius:var(--r2);border:0;cursor:pointer;
+  background:#ffd166;color:#5a3c00;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+aside button#btnRefresh:hover{background:#ffdd8a}
+aside button#btnRefresh:active{transform:translateY(1px)}
+
+.stale{position:fixed;top:0;left:0;right:0;z-index:300;background:#f5a623;color:#5a3c00;
+  font-size:13px;padding:9px 16px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.stale button{margin-left:10px;font-family:inherit;font-size:12.5px;padding:4px 12px;
+  border:0;border-radius:7px;background:#5a3c00;color:#fff;cursor:pointer}
+.ver{font-size:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);
+  border-radius:8px;padding:5px 9px;margin:0 0 4px;text-align:center;color:#d8e9fb}
+.hint{font-size:11.5px;color:#b9d4f2;margin-top:20px;padding-top:15px;
+  border-top:1px solid rgba(255,255,255,.24);line-height:1.6}
+.hint code{background:rgba(255,255,255,.16);color:#e8f3ff;padding:1px 5px;
+  border-radius:5px;font-size:11px}
+
+/* ---------- main ---------- */
+main{margin-left:270px;flex:1;padding:26px 30px 60px;min-width:0}
+h1{font-size:21px;margin:0 0 3px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:22px;display:flex;align-items:center;gap:14px}
+#topExport{margin-left:auto}
+span.xp{margin-left:auto;display:inline-flex;gap:7px;flex:0 0 auto}
+h2 .mini.right + .xp{margin-left:10px}
+a.dl.sm{font-size:11.5px;padding:5px 11px;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:26px}
+.card{background:var(--panel);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh)}
+.card .k{font-size:11.5px;color:var(--muted)}
+.card .v{font-size:25px;font-weight:700;line-height:1.25;margin-top:2px}
+.card .u{font-size:11.5px;color:var(--ink2)}
+.c-sky .v{color:var(--sky)} .c-mint .v{color:var(--mint)}
+.c-sun .v{color:var(--sun)} .c-lav .v{color:var(--lav)}
+.c-teal .v{color:#0d9488} .c-indigo .v{color:#4f46e5}
+
+section{background:var(--panel);border-radius:var(--r);padding:20px 22px;margin-bottom:20px;box-shadow:var(--sh)}
+section h2{font-size:15.5px;margin:0 0 4px;display:flex;align-items:baseline;gap:8px}
+section h2 .no{background:var(--sky);color:#fff;border-radius:7px;font-size:11.5px;
+  padding:2px 8px;font-weight:600;flex:0 0 auto}
+.cond{font-size:11.5px;color:var(--muted);margin:6px 0 14px;padding-left:2px}
+.cond div{margin:1px 0}
+
+.tw{overflow-x:auto;border-radius:var(--r2);border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
+th,td{padding:7px 11px;text-align:right;border-bottom:1px solid var(--line)}
+th{background:#f5fafe;color:var(--ink2);font-weight:600;font-size:12px;position:sticky;top:0}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:#fff;z-index:2}
+th:first-child{background:#f5fafe;z-index:3}
+tbody tr:hover td{background:#f8fcff}
+tbody tr:hover td:first-child{background:#f8fcff}
+tr.total td{font-weight:700;background:#eef7fd;border-top:2px solid var(--sky)}
+tr.total td:first-child{background:#eef7fd}
+th.grp{text-align:center;border-left:1px solid var(--line)}
+td.pct{color:var(--sky);font-weight:600}
+
+.msg{padding:40px;text-align:center;color:var(--muted)}
+.err{background:#fff2f4;color:#c2415a;border-radius:var(--r2);padding:14px 16px;font-size:13px}
+/* ---------- กราฟ ---------- */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:2px 0 8px;font-size:12px;color:var(--ink2)}
+.legend .lg{display:inline-flex;align-items:center;gap:6px}
+.legend .lg i{width:13px;height:13px;border-radius:4px;display:inline-block}
+.chartwrap{overflow-x:auto;padding-bottom:4px;margin-bottom:14px}
+.chartwrap svg{display:block;max-width:none}
+.gb rect{transition:opacity .15s}
+.chartwrap svg:hover .gb rect{opacity:.45}
+.chartwrap svg .gb:hover rect{opacity:1}
+/* ---------- ปุ่มเล็ก + ป๊อปอัพ ---------- */
+button.mini{font-family:inherit;font-size:11.5px;padding:4px 10px;border-radius:8px;
+  border:1px solid #cfe6f7;background:#f2f9fe;color:#2f6fa8;cursor:pointer;white-space:nowrap}
+button.mini:hover{background:#2f9fdc;color:#fff;border-color:#2f9fdc}
+button.mini.warn{border-color:#f6d6a8;background:#fef6ea;color:#b8770f}
+button.mini.warn:hover{background:#f5a623;color:#fff;border-color:#f5a623}
+button.mini + button.mini{margin-left:5px}
+span.hgrp{margin-left:auto;display:inline-flex;gap:6px;flex:0 0 auto}
+span.hgrp + .xp{margin-left:10px}
+button.mini.chartbtn{margin-left:auto;font-size:12px;padding:5px 12px;
+  border-color:#cbd5ff;background:#eef1ff;color:#4338ca}
+button.mini.chartbtn:hover,button.mini.chartbtn.on{background:#4f46e5;color:#fff;
+  border-color:#4f46e5}
+button.mini.chartbtn + .xp{margin-left:8px}
+button.mini.insbtn{margin-left:auto;font-size:12px;padding:5px 12px;
+  border-color:#fde6b0;background:#fff8e8;color:#a8730c}
+button.mini.insbtn:hover,button.mini.insbtn.on{background:#f5a623;color:#fff;border-color:#f5a623}
+button.mini.insbtn + .chartbtn{margin-left:6px}
+
+/* ---------- สรุปประเด็น ---------- */
+.insight{border:1px solid #ffe8bd;background:linear-gradient(180deg,#fffaf0,#fff);
+  border-radius:var(--r2);padding:14px 16px;margin-bottom:16px}
+.insight[hidden]{display:none}
+.ihead{font-size:13px;font-weight:700;color:#a8730c;margin-bottom:8px}
+.ilist{margin:0 0 4px;padding:0;list-style:none}
+.ilist li{position:relative;padding:3px 0 3px 22px;font-size:13px;line-height:1.55;color:var(--ink)}
+.ilist li b{position:absolute;left:0;top:3px;width:16px;text-align:center;font-size:11px}
+.ilist li.t-good b{color:#16a34a} .ilist li.t-warn b{color:#d97706}
+.ilist li.t-bad b{color:#dc2626}  .ilist li.t-info b{color:var(--sky)}
+.isub{font-size:12px;font-weight:600;color:var(--ink2);margin:12px 0 7px;
+  padding-top:10px;border-top:1px dashed #f0dcb4}
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:8px}
+.icard{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.5;
+  background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px 10px}
+.icard .ik{flex:0 0 auto;min-width:34px;text-align:center;font-weight:700;font-size:12px;
+  border-radius:6px;padding:2px 7px;background:#eef4fa;color:var(--ink2)}
+.icard.t-good{border-color:#bbf0d0;background:#f4fdf7}
+.icard.t-good .ik{background:#dcfce7;color:#15803d}
+.icard.t-warn{border-color:#fde3b0;background:#fffbf2}
+.icard.t-warn .ik{background:#fef3c7;color:#b45309}
+.icard.t-bad{border-color:#fecdd3;background:#fff6f7}
+.icard.t-bad .ik{background:#ffe4e6;color:#be123c}
+.tchart{border:1px solid var(--line);border-radius:var(--r2);padding:14px 16px 6px;
+  margin-bottom:16px;background:#fbfdff}
+.tchart .ctitle{font-size:12px;color:var(--muted);margin-bottom:6px}
+.tchart[hidden]{display:none}
+/* ตรึงคอลัมน์ "ติดตาม" ไว้ขอบขวา จะได้ไม่ตกขอบจอเวลาตารางกว้าง */
+td.act,th.act{text-align:left;position:sticky;right:0;background:#fff;z-index:2;
+  box-shadow:-6px 0 8px -6px rgba(23,54,79,.18)}
+th.act{background:#f5fafe;z-index:3}
+tbody tr:hover td.act{background:#f8fcff}
+tr.clickable:hover td.act{background:#eaf5ff}
+span.ok{font-size:11.5px;color:var(--mint)}
+
+.modal{position:fixed;inset:0;z-index:200;background:rgba(23,54,79,.45);
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.modal[hidden]{display:none}
+.sheet{background:#fff;border-radius:var(--r);width:min(1180px,100%);max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(23,54,79,.3)}
+.sheet header{display:flex;align-items:center;gap:12px;padding:16px 20px;
+  border-bottom:1px solid var(--line)}
+.sheet header b{font-size:15.5px}
+.sheet header span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.sheet .x{margin-left:auto;border:0;background:#f2f7fb;color:var(--ink2);cursor:pointer;
+  width:32px;height:32px;border-radius:9px;font-size:14px}
+.sheet .x:hover{background:#e5eef6}
+.sheet .bar{display:flex;gap:10px;align-items:center;padding:12px 20px;background:#f8fbfe;
+  border-bottom:1px solid var(--line)}
+.sheet .bar input{flex:1;font-family:inherit;font-size:13px;padding:8px 12px;
+  border:1px solid var(--line);border-radius:9px;outline:none;background:#fff}
+.sheet .bar input:focus{border-color:var(--sky)}
+a.dl{font-size:12.5px;padding:8px 14px;border-radius:9px;text-decoration:none;
+  border:1px solid #cfe6f7;color:#2f6fa8;background:#fff;white-space:nowrap;cursor:pointer}
+a.dl:hover{background:#eaf5fd}
+a.dl.primary{background:#1cbfa0;border-color:#1cbfa0;color:#fff}
+a.dl.primary:hover{background:#16a88c}
+.mbody{overflow:auto;padding:0 20px 20px}
+.mbody table{white-space:nowrap}
+.mbody th{top:0;background:#f5fafe}
+.mbody td:first-child,.mbody th:first-child{position:static}
+.note{font-size:11.5px;color:var(--muted);padding:10px 0 6px}
+
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:#eaf5ff}
+tr.clickable:hover td:first-child{background:#eaf5ff}
+td .code{display:inline-block;font-size:11px;color:var(--muted);background:#f2f7fb;
+  border-radius:5px;padding:0 5px;margin-right:2px}
+td.pct2{color:#0d9488;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-label="DentalDX">
+        <defs>
+          <linearGradient id="lgbg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#eaf6ff"/><stop offset="100%" stop-color="#cfe6fb"/>
+          </linearGradient>
+          <linearGradient id="lgtooth" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#dbeeff"/>
+          </linearGradient>
+        </defs>
+        <rect width="48" height="48" rx="14" fill="url(#lgbg)"/>
+        <!-- ใบหน้าเด็ก -->
+        <circle cx="21" cy="21.5" r="13" fill="#ffd7b0"/>
+        <path d="M8.2 21.5C8.2 13.9 14 7.8 21 7.8s12.8 6.1 12.8 13.7c-1.9-3.4-5-5.2-8.4-5.6
+                 -4.6-.6-9.2.9-12.4 3.4-1.7 1.3-3.2 2.9-4.8 2.2z" fill="#5b4636"/>
+        <circle cx="16.4" cy="22.4" r="1.7" fill="#4a3728"/>
+        <circle cx="25.6" cy="22.4" r="1.7" fill="#4a3728"/>
+        <ellipse cx="12.6" cy="26.4" rx="2.2" ry="1.5" fill="#ff9d9d" opacity=".55"/>
+        <ellipse cx="29.4" cy="26.4" rx="2.2" ry="1.5" fill="#ff9d9d" opacity=".55"/>
+        <path d="M16 27.6c1.4 3.2 8.6 3.2 10 0z" fill="#fff" stroke="#c9744f"
+              stroke-width="1.2" stroke-linejoin="round"/>
+        <!-- ฟันน้ำนมมุมขวาล่าง -->
+        <circle cx="36" cy="35" r="10.5" fill="#2f9fdc"/>
+        <path d="M36 28.6c-3.4 0-4.9 2.3-4.9 4.6 0 2.7 1.1 6 2.4 7.3.9.9 1.8.3 2-1.2l.4-2.7
+                 c.1-.7.3-.7.4 0l.4 2.7c.2 1.5 1.1 2.1 2 1.2 1.3-1.3 2.4-4.6 2.4-7.3
+                 0-2.3-1.5-4.6-4.9-4.6z" fill="url(#lgtooth)"/>
+      </svg>
+    </div>
+    <div><b>DentalDX</b><span>Data Exchange Analyzer</span></div>
+  </div>
+  <div class="ver">v{{ version }} · หน้าเว็บ {{ build }}</div>
+
+  <label>กลุ่มอายุ</label>
+  <select id="selProfile"></select>
+
+  <label>จังหวัด</label>
+  <select id="selPv"><option value="">— ทั้งหมด —</option></select>
+
+  <label>อำเภอ</label>
+  <select id="selAmp"><option value="">— ทั้งหมด —</option></select>
+
+  <label>หน่วยบริการ</label>
+  <select id="selHos"><option value="">— ทั้งหมด —</option></select>
+
+  <button id="btnRefresh">↻ โหลดข้อมูลใหม่</button>
+
+  <div class="hint">
+    วางไฟล์ข้อมูล (.xlsx) ไว้ใน<br><code>data/&lt;กลุ่มอายุ&gt;/</code><br>
+    แล้วกด "โหลดข้อมูลใหม่"<br><br>
+    แก้เงื่อนไขการคำนวณได้ที่<br><code>profiles/*.yaml</code>
+  </div>
+</aside>
+
+<main>
+  <h1 id="title">สรุปผลการสำรวจสภาวะช่องปาก</h1>
+  <div class="sub"><span id="scope">กำลังโหลด…</span><span id="topExport"></span></div>
+  <div id="cards" class="cards"></div>
+  <div id="body"><div class="msg">กำลังโหลดข้อมูล…</div></div>
+</main>
+</div>
+
+<!-- ป๊อปอัพรายชื่อเด็กที่ยังไม่ได้ตรวจฟัน -->
+<div id="modal" class="modal" hidden>
+  <div class="sheet">
+    <header>
+      <div>
+        <b id="mTitle">เด็กที่ยังไม่ได้ตรวจฟัน</b>
+        <span id="mSub"></span>
+      </div>
+      <button id="mClose" class="x" title="ปิด">✕</button>
+    </header>
+    <div class="bar">
+      <input id="mSearch" type="search" placeholder="ค้นหา ชื่อ / PID / บ้านเลขที่ / ตำบล…">
+      <a id="mCsv" class="dl">⬇ CSV</a>
+      <a id="mXlsx" class="dl primary">⬇ Excel</a>
+    </div>
+    <div id="mBody" class="mbody"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let AREAS = {}, CURRENT = null;
+const PAGE_BUILD = "{{ build }}";
+
+// เตือนถ้าหน้าเว็บที่เปิดอยู่เก่ากว่าที่เซิร์ฟเวอร์มี (ติด cache)
+(async () => {
+  try {
+    const v = await (await fetch('/api/version', {cache: 'no-store'})).json();
+    if (v.build && PAGE_BUILD && v.build !== PAGE_BUILD) {
+      const b = document.createElement('div');
+      b.className = 'stale';
+      b.innerHTML = `หน้านี้เป็นรุ่นเก่า (${PAGE_BUILD}) — เซิร์ฟเวอร์มีรุ่น ${v.build} ` +
+        `<button onclick="location.replace('/?v=' + Date.now())">โหลดรุ่นล่าสุด</button>`;
+      document.body.prepend(b);
+    }
+  } catch (e) { /* ไม่เป็นไร */ }
+})();
+
+const fmt = (v, d) => v === null || v === undefined || v === '' ? '–'
+  : (typeof v === 'number' ? v.toLocaleString('th-TH',
+      {minimumFractionDigits: d ?? 0, maximumFractionDigits: d ?? 0}) : v);
+
+async function api(path) {
+  const r = await fetch(path);
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+// ---------- ตัวเลือกพื้นที่ ----------
+function fillSel(sel, items, keep) {
+  sel.innerHTML = '<option value="">— ทั้งหมด —</option>' +
+    items.map(i => `<option value="${i.v}">${i.t}</option>`).join('');
+  if (keep && items.some(i => i.v === keep)) sel.value = keep;
+}
+
+function refreshAreaSelects() {
+  const pv = $('#selPv').value, amp = $('#selAmp').value;
+  fillSel($('#selPv'), Object.keys(AREAS).sort().map(p => ({v: p, t: p})), pv);
+  const amps = pv && AREAS[pv] ? Object.keys(AREAS[pv]).sort()
+    : [...new Set(Object.values(AREAS).flatMap(o => Object.keys(o)))].sort();
+  fillSel($('#selAmp'), amps.map(a => ({v: a, t: a})), amp);
+  const a2 = $('#selAmp').value;
+  let hos = [];
+  for (const [p, o] of Object.entries(AREAS)) {
+    if (pv && p !== pv) continue;
+    for (const [a, list] of Object.entries(o)) {
+      if (a2 && a !== a2) continue;
+      hos.push(...list);
+    }
+  }
+  hos.sort((x, y) => x.name.localeCompare(y.name, 'th'));
+  fillSel($('#selHos'), hos.map(h => ({v: h.code, t: h.name})), $('#selHos').value);
+}
+
+// ---------- render ----------
+function kpiCards(s) {
+  const c = [
+    ['เด็กในเขตรับผิดชอบ', fmt(s.target), 'คน', 'c-lav'],
+    ['ได้รับการตรวจฟัน', fmt(s.examined), `คน (${fmt(s.examined_pct, 1)}%)`, 'c-teal'],
+    ['ผ่านเกณฑ์คุณภาพ', fmt(s.qualified), `คน (${fmt(s.qualified_pct, 1)}%)`, 'c-indigo'],
+    ['หน่วยบริการ', fmt(s.hospitals), `แห่ง / ${s.districts} อำเภอ`, 'c-sun'],
+    ['ช่วงวันที่ตรวจ', s.date_min, `ถึง ${s.date_max}`, 'c-sky'],
+  ];
+  $('#cards').innerHTML = c.map(([k, v, u, cl]) =>
+    `<div class="card ${cl}"><div class="k">${k}</div><div class="v">${v}</div>
+     <div class="u">${u}</div></div>`).join('');
+}
+
+function isPct(col) { return col.includes('ร้อยละ'); }
+
+// ปุ่มส่งออกของแต่ละตาราง (which = 'overview' | เลขตาราง | 'all')
+function exportBtns(which) {
+  const q = new URLSearchParams({profile: $('#selProfile').value,
+    pv: $('#selPv').value, amp: $('#selAmp').value, hos: $('#selHos').value,
+    table: which});
+  return `<span class="xp">
+    <a class="dl sm" href="/api/table.csv?${q}" title="ส่งออกเป็น CSV">⬇ CSV</a>
+    <a class="dl sm primary" href="/api/table.xlsx?${q}" title="ส่งออกเป็น Excel">⬇ Excel</a>
+  </span>`;
+}
+
+function renderTable(t) {
+  // จัดหัวตารางแบบ 2 ชั้นถ้าคอลัมน์เป็นรูปแบบ "metric|จำนวน"
+  const cols = t.columns.filter(c => !c.includes('|รวมซี่'));
+  const rowLabel = t.row_label || 'อายุ (ปี)';
+  const grouped = cols.some(c => c.includes('|'));
+  let thead;
+  if (grouped) {
+    const groups = [];
+    cols.forEach(c => {
+      const [g, s] = c.includes('|') ? c.split('|') : [c, null];
+      const last = groups[groups.length - 1];
+      if (last && last.g === g && s) last.subs.push({c, s});
+      else groups.push({g, subs: s ? [{c, s}] : []});
+    });
+    thead = '<tr>' + groups.map(g => g.subs.length
+      ? `<th class="grp" colspan="${g.subs.length}">${g.g}</th>`
+      : `<th rowspan="2">${g.g === 'row' ? rowLabel : g.g}</th>`).join('') + '</tr><tr>' +
+      groups.flatMap(g => g.subs.map(s => `<th>${s.s}</th>`)).join('') + '</tr>';
+  } else {
+    thead = '<tr>' + cols.map(c =>
+      `<th>${c === 'row' ? rowLabel : c}</th>`).join('') + '</tr>';
+  }
+
+  const tbody = t.rows.map(r => {
+    const tot = r.row === 'รวม';
+    return `<tr class="${tot ? 'total' : ''}">` + cols.map(c => {
+      const v = r[c];
+      const d = isPct(c) || (t.kind === 'mean' && c !== 'row' && c !== 'ฐาน') ? 2 : 0;
+      return `<td class="${isPct(c) ? 'pct' : ''}">${fmt(v, c === 'row' ? 0 : d)}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+
+  const chart = tableChart(t);
+  const ins = insightBlock(t);
+  return `<section>
+    <h2><span class="no">ตารางที่ ${t.no}</span> ${t.title}
+      ${ins ? `<button class="mini insbtn on" data-toggle="ins">✕ ซ่อนสรุป</button>` : ''}
+      ${chart ? `<button class="mini chartbtn" data-toggle="chart">📊 ดูกราฟ</button>` : ''}
+      ${exportBtns(t.no)}</h2>
+    <div class="cond">${(t.conditions || []).map(c => `<div>• ${c}</div>`).join('')}</div>
+    ${ins}${chart}
+    <div class="tw"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>
+  </section>`;
+}
+
+// ---------- กราฟแท่งคู่ (SVG) ----------
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+const PALETTE = [
+  {c1: '#7dd3fc', c2: '#0284c7', ink: '#0369a1'},
+  {c1: '#5eead4', c2: '#0d9488', ink: '#0f766e'},
+  {c1: '#a5b4fc', c2: '#4f46e5', ink: '#4338ca'},
+  {c1: '#fcd34d', c2: '#d97706', ink: '#b45309'},
+  {c1: '#fda4af', c2: '#e11d48', ink: '#be123c'},
+  {c1: '#d8b4fe', c2: '#7c3aed', ink: '#6d28d9'},
+];
+
+let CHART_SEQ = 0;
+
+function niceMax(v) {
+  if (!(v > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  return Math.ceil(v / p * 2) / 2 * p;   // ปัดขึ้นเป็นครึ่งหลัก เช่น 0.61 -> 0.65
+}
+
+function groupedBarChart(rows, series, opt) {
+  const o = Object.assign({h: 300, padL: 46, padR: 12, padT: 18, padB: 92,
+                           slotMin: 62, max: null, suffix: '', dec: null}, opt || {});
+  const n = rows.length;
+  if (!n || !series.length) return '';
+
+  let max = o.max;
+  if (max === null) {
+    const all = rows.flatMap(r => series.map(s => r[s.key])).filter(v => typeof v === 'number');
+    max = niceMax(Math.max(...all, 0));
+  }
+  const dec = o.dec !== null ? o.dec : (max <= 5 ? 2 : max <= 20 ? 1 : 0);
+
+  const slot = Math.max(o.slotMin, 14 * series.length + 26, 900 / n);
+  const w = o.padL + o.padR + slot * n;
+  const plotH = o.h - o.padT - o.padB;
+  const y = v => o.padT + plotH * (1 - Math.max(0, Math.min(max, v || 0)) / max);
+  const bw = Math.min(22, (slot - 14) / series.length);
+  const gap = series.length > 4 ? 2 : 3;
+  const showVal = n * series.length <= 30;
+
+  const grid = [0, .25, .5, .75, 1].map(f => {
+    const v = max * f;
+    return `<line x1="${o.padL}" x2="${w - o.padR}" y1="${y(v)}" y2="${y(v)}"
+          stroke="var(--line)" stroke-width="1"/>
+    <text x="${o.padL - 8}" y="${y(v) + 4}" text-anchor="end"
+          font-size="10.5" fill="var(--muted)">${
+            max <= 5 ? v.toFixed(2) : max <= 20 ? v.toFixed(1) : v.toFixed(0)}</text>`;
+  }).join('');
+
+  const bars = rows.map((r, i) => {
+    const cx = o.padL + slot * i + slot / 2;
+    const total = series.length * bw + (series.length - 1) * gap;
+    return series.map((s, k) => {
+      const v = r[s.key];
+      if (typeof v !== 'number') return '';
+      const x = cx - total / 2 + k * (bw + gap);
+      const yy = y(v), hh = o.padT + plotH - yy;
+      return `<g class="gb">
+        <rect x="${x}" y="${yy}" width="${bw}" height="${Math.max(1, hh)}"
+              rx="4" fill="url(#${o.uid}g${k})"><title>${esc(r.name)}
+${s.label}: ${v}${o.suffix}</title></rect>
+        ${showVal ? `<text x="${x + bw / 2}" y="${yy - 4}" text-anchor="middle"
+              font-size="9.5" fill="${s.ink}" font-weight="600">${v.toFixed(dec)}</text>` : ''}
+      </g>`;
+    }).join('');
+  }).join('');
+
+  const labels = rows.map((r, i) => {
+    const cx = o.padL + slot * i + slot / 2;
+    const nm = r.name.length > 16 ? r.name.slice(0, 15) + '…' : r.name;
+    return o.flatLabels
+      ? `<text x="${cx}" y="${o.h - o.padB + 18}" text-anchor="middle" font-size="11.5"
+          fill="var(--ink2)" class="xl">${esc(nm)}</text>`
+      : `<text transform="translate(${cx},${o.h - o.padB + 14}) rotate(-40)"
+          text-anchor="end" font-size="10.5" fill="var(--ink2)" class="xl">${esc(nm)}</text>`;
+  }).join('');
+
+  const defs = series.map((s, k) => `
+    <linearGradient id="${o.uid}g${k}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${s.c1}"/><stop offset="100%" stop-color="${s.c2}"/>
+    </linearGradient>`).join('');
+
+  const legend = series.map(s => `
+    <span class="lg"><i style="background:linear-gradient(180deg,${s.c1},${s.c2})"></i>${s.label}</span>`
+  ).join('');
+
+  return `<div class="legend">${legend}</div>
+    <div class="chartwrap"><svg viewBox="0 0 ${w} ${o.h}" width="${w}" height="${o.h}"
+      preserveAspectRatio="xMinYMin meet"><defs>${defs}</defs>
+      ${grid}${bars}${labels}</svg></div>`;
+}
+
+// ---------- สรุปประเด็น (insight) ----------
+const TONE_ICON = {good: '✔', warn: '!', bad: '▲', info: '•'};
+
+function insightBlock(t) {
+  const ins = t.insight || {};
+  const sum = ins.summary || [], rows = ins.rows || [];
+  if (!sum.length && !rows.length) return '';
+  const rowWord = (t.row_label || '').replace(' (ปี)', '');
+  return `<div class="insight">
+    <div class="ihead">💡 สรุปประเด็นสำคัญ</div>
+    <ul class="ilist">${sum.map(s =>
+      `<li class="t-${s.tone}"><b>${TONE_ICON[s.tone] || '•'}</b>${esc(s.text)}</li>`).join('')}</ul>
+    ${rows.length ? `<div class="isub">แยกราย${esc(rowWord)}</div>
+      <div class="igrid">${rows.map(s =>
+        `<div class="icard t-${s.tone}"><span class="ik">${esc(s.row)}</span>
+          <span class="iv">${esc(s.text)}</span></div>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+// กราฟของตารางสถิติ (ตารางที่ 2-7) — ไม่ทำให้ตารางคุณภาพข้อมูล
+function tableChart(t) {
+  const names = t.metric_names || [];
+  if (!names.length || t.kind === 'quality') return '';
+  const uid = 'c' + (++CHART_SEQ) + '_';
+  const rows = t.rows.filter(r => String(r.row) !== 'รวม')
+    .map(r => ({...r, key: String(r.row), name: String(r.row)}));
+  if (!rows.length) return '';
+
+  const pct = t.kind === 'count_pct';
+  const series = names.map((n, i) => ({
+    key: pct ? `${n}|ร้อยละ` : n, label: n, ...PALETTE[i % PALETTE.length]}));
+
+  return `<div class="tchart" hidden>
+    <div class="ctitle">${esc(t.row_label || '')} × ${pct ? 'ร้อยละ' : 'ค่าเฉลี่ยต่อคน'}</div>
+    ${groupedBarChart(rows, series, {uid, h: 300, padB: 44, flatLabels: true,
+      max: pct ? 100 : null, suffix: pct ? '%' : '', slotMin: 70})}
+  </div>`;
+}
+
+// ---------- แถบเปรียบเทียบพื้นที่ ----------
+function renderOverview(rows, labels, level) {
+  const L = labels || {};
+  const cfL = L.caries_free_label || 'ปราศจากฟันผุ';
+  const dmftL = L.dmft_label || 'DMFT เฉลี่ย';
+  if (!rows || !rows.length) return '';
+  const isDistrict = level !== 'unit';
+  const unitName = isDistrict ? 'อำเภอ' : 'หน่วยบริการ';
+
+  const series = [
+    {key: 'examined_pct', label: 'ร้อยละได้รับการตรวจฟัน',
+     c1: '#5eead4', c2: '#0d9488', ink: '#0f766e'},
+    {key: 'caries_free_pct', label: 'ร้อยละ' + cfL,
+     c1: '#a5b4fc', c2: '#4f46e5', ink: '#4338ca'},
+  ];
+
+  const tb = rows.map(r => `<tr class="${isDistrict ? 'clickable' : ''}"
+      ${isDistrict ? `data-amp="${esc(r.key)}"` : ''}>
+      <td>${r.code ? `<span class="code">${esc(r.code)}</span> ` : ''}${esc(r.name)}</td>
+      <td>${fmt(r.target)}</td><td>${fmt(r.examined)}</td>
+      <td class="pct2">${fmt(r.examined_pct, 2)}</td>
+      <td>${fmt(r.qualified)}</td><td class="pct">${fmt(r.qualified_pct, 2)}</td>
+      <td class="pct">${fmt(r.caries_free_pct, 2)}</td>
+      <td>${fmt(r.dmft, 2)}</td>
+      <td class="act">${(() => {
+        const key = esc(r.key), nm = esc(r.name);
+        const at = isDistrict ? 'data-amp' : 'data-hos';
+        const b = [];
+        if (r.pending > 0) b.push(`<button class="mini" ${at}="${key}" data-name="${nm}"
+          data-kind="pending">ยังไม่ได้ตรวจ (${fmt(r.pending)})</button>`);
+        if (r.failed > 0) b.push(`<button class="mini warn" ${at}="${key}" data-name="${nm}"
+          data-kind="failed">ไม่ผ่านเกณฑ์ (${fmt(r.failed)})</button>`);
+        return b.length ? b.join(' ') : '<span class="ok">ครบถ้วน</span>';
+      })()}</td></tr>`).join('');
+
+  const totalPending = rows.reduce((a, r) => a + (r.pending || 0), 0);
+  const totalFailed = rows.reduce((a, r) => a + (r.failed || 0), 0);
+  const allLabel = isDistrict ? 'ทั้งหมดในขอบเขตนี้' : 'ทั้งอำเภอ';
+
+  return `<section>
+    <h2><span class="no">ภาพรวม</span> เปรียบเทียบราย${unitName} (เรียงตามรหัส${unitName})
+      <span class="hgrp">
+      ${totalPending > 0 ? `<button class="mini" data-name="${allLabel}" data-kind="pending"
+        >ยังไม่ได้ตรวจ${allLabel} (${fmt(totalPending)})</button>` : ''}
+      ${totalFailed > 0 ? `<button class="mini warn" data-name="${allLabel}" data-kind="failed"
+        >ไม่ผ่านเกณฑ์${allLabel} (${fmt(totalFailed)})</button>` : ''}
+      </span>
+      ${exportBtns('overview')}</h2>
+    <div class="cond"><div>• ร้อยละได้รับการตรวจฟัน = จำนวนที่ตรวจ ÷ เด็กในเขตรับผิดชอบทั้งหมดในไฟล์</div>
+      <div>• ร้อยละ${cfL} = คิดจากผู้ที่ผ่านเกณฑ์คุณภาพ</div>
+      ${isDistrict ? '<div>• คลิกที่แถวเพื่อดูรายหน่วยบริการในอำเภอนั้น</div>' : ''}
+      <div>• คอลัมน์ <b>ติดตาม</b> (ขวาสุดของตาราง): <b>ยังไม่ได้ตรวจ</b> = ยังไม่มีวันที่ตรวจ |
+        <b>ไม่ผ่านเกณฑ์</b> = ตรวจแล้วแต่ข้อมูลตกเกณฑ์คุณภาพ ควรตามมาตรวจ/บันทึกใหม่</div></div>
+    ${groupedBarChart(rows.filter(r => r.examined > 0), series,
+      {uid: 'ov_', max: 100, suffix: '%', dec: 0, h: isDistrict ? 300 : 320,
+       padB: isDistrict ? 92 : 130, slotMin: isDistrict ? 62 : 56})}
+    <div class="tw"><table><thead><tr>
+      <th>${unitName}</th><th>เป้าหมาย (คน)</th><th>ตรวจ (คน)</th><th>%ตรวจ</th>
+      <th>ผ่านเกณฑ์</th><th>%ผ่านเกณฑ์</th>
+      <th>%${cfL}</th><th>${dmftL}</th><th class="act">ติดตาม</th></tr></thead>
+      <tbody>${tb}</tbody></table></div>
+  </section>`;
+}
+
+// ---------- รายชื่อเด็กที่ยังไม่ได้ตรวจฟัน ----------
+let PENDING = {columns: [], rows: []};
+
+function pendingParams(o) {
+  const q = new URLSearchParams({profile: $('#selProfile').value,
+    pv: $('#selPv').value, amp: o.amp || $('#selAmp').value,
+    kind: o.kind || 'pending'});
+  const hos = o.hos || $('#selHos').value;
+  if (hos) q.set('hos', hos);
+  return q;
+}
+
+function renderPendingRows(filter) {
+  const f = (filter || '').trim().toLowerCase();
+  const cols = PENDING.columns;
+  const rows = f ? PENDING.rows.filter(r =>
+    cols.some(c => String(r[c] ?? '').toLowerCase().includes(f))) : PENDING.rows;
+  if (!rows.length) {
+    $('#mBody').innerHTML = '<div class="msg">ไม่พบรายการ</div>';
+    return;
+  }
+  $('#mBody').innerHTML =
+    `<div class="note">แสดง ${rows.length.toLocaleString('th-TH')} รายการ` +
+    (PENDING.total > PENDING.shown
+      ? ` (บนหน้าจอจำกัด ${PENDING.shown.toLocaleString('th-TH')} จากทั้งหมด ` +
+        `${PENDING.total.toLocaleString('th-TH')} — ไฟล์ที่ส่งออกได้ครบทุกรายการ)` : '') +
+    '</div><div class="tw"><table><thead><tr>' +
+    cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' + cols.map(c =>
+      `<td>${r[c] === null || r[c] === undefined ? '–' : esc(r[c])}</td>`).join('') + '</tr>').join('') +
+    '</tbody></table></div>';
+}
+
+const KIND_TITLE = {pending: 'เด็กที่ยังไม่ได้ตรวจฟัน',
+                    failed: 'เด็กที่ตรวจแล้วไม่ผ่านเกณฑ์คุณภาพ'};
+const KIND_HINT = {
+  pending: 'ยังไม่มีวันที่ตรวจในข้อมูล — ควรนัดมาตรวจ',
+  failed: 'ตรวจแล้วแต่ข้อมูลตกเกณฑ์คุณภาพ จึงไม่ถูกนับในตารางที่ 2 เป็นต้นไป — ควรตามมาตรวจ/บันทึกใหม่',
+};
+
+async function openPending(o, name) {
+  const kind = o.kind || 'pending';
+  const q = pendingParams({...o, kind});
+  $('#mTitle').textContent = KIND_TITLE[kind] + ' — ' + name;
+  $('#mSub').textContent = 'กำลังโหลด…';
+  $('#mSearch').value = '';
+  $('#mBody').innerHTML = '<div class="msg">กำลังโหลด…</div>';
+  $('#modal').hidden = false;
+  $('#mCsv').href = '/api/people.csv?' + q;
+  $('#mXlsx').href = '/api/people.xlsx?' + q;
+  try {
+    const d = await api('/api/people?' + q);
+    PENDING = d;
+    $('#mSub').textContent = `ทั้งหมด ${d.total.toLocaleString('th-TH')} คน — ${KIND_HINT[kind]}`;
+    renderPendingRows('');
+  } catch (e) {
+    $('#mBody').innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+}
+
+$('#mClose').onclick = () => { $('#modal').hidden = true; };
+$('#modal').onclick = e => { if (e.target.id === 'modal') $('#modal').hidden = true; };
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') $('#modal').hidden = true;
+});
+$('#mSearch').oninput = e => renderPendingRows(e.target.value);
+
+async function loadReport(refresh) {
+  const p = $('#selProfile').value;
+  if (!p) return;
+  $('#body').innerHTML = '<div class="msg">กำลังคำนวณ…</div>';
+  const q = new URLSearchParams({profile: p, pv: $('#selPv').value,
+    amp: $('#selAmp').value, hos: $('#selHos').value});
+  if (refresh) q.set('refresh', '1');
+  try {
+    const r = await api('/api/report?' + q);
+    CURRENT = r;
+    const parts = [r.scope.pvname, r.scope.ampname,
+      r.scope.hoscode ? $('#selHos').selectedOptions[0].text : null].filter(Boolean);
+    $('#title').textContent = `สรุปผลการสำรวจสภาวะช่องปาก — ${r.profile.label}`;
+    $('#scope').textContent = 'ขอบเขต: ' + (parts.length ? parts.join(' › ') : 'ทุกพื้นที่ในข้อมูล');
+    kpiCards(r.summary);
+    const qa = new URLSearchParams({profile: p, pv: $('#selPv').value,
+      amp: $('#selAmp').value, hos: $('#selHos').value, table: 'all'});
+    $('#topExport').innerHTML =
+      `<a class="dl sm primary" href="/api/table.xlsx?${qa}"
+          title="ทุกตารางในไฟล์เดียว แยกเป็นชีต">⬇ ส่งออกทุกตาราง (Excel)</a>`;
+    const areaRows = r.level === 'unit' ? r.units : r.districts;
+    $('#body').innerHTML = renderOverview(areaRows, r.overview_labels, r.level) +
+      r.tables.map(renderTable).join('');
+    // ปุ่มสลับกราฟ / สรุปประเด็น ของแต่ละตาราง
+    const toggles = [['chartbtn', '.tchart', '📊 ดูกราฟ', '✕ ซ่อนกราฟ'],
+                     ['insbtn', '.insight', '💡 สรุปประเด็น', '✕ ซ่อนสรุป']];
+    toggles.forEach(([cls, sel, offTxt, onTxt]) => {
+      $('#body').querySelectorAll('button.' + cls).forEach(b => {
+        b.onclick = () => {
+          const box = b.closest('section').querySelector(sel);
+          box.hidden = !box.hidden;
+          b.textContent = box.hidden ? offTxt : onTxt;
+          b.classList.toggle('on', !box.hidden);
+        };
+      });
+    });
+    // ปุ่มดูเด็กที่ยังไม่ได้ตรวจฟัน
+    $('#body').querySelectorAll('button.mini:not(.chartbtn):not(.insbtn)').forEach(b => {
+      b.onclick = ev => {
+        ev.stopPropagation();
+        openPending({amp: b.dataset.amp, hos: b.dataset.hos, kind: b.dataset.kind},
+                    b.dataset.name);
+      };
+    });
+    // คลิกแถวอำเภอ -> ไล่ลงรายหน่วยบริการ
+    $('#body').querySelectorAll('tr.clickable').forEach(tr => {
+      tr.onclick = () => {
+        $('#selAmp').value = tr.dataset.amp;
+        $('#selHos').value = '';
+        refreshAreaSelects();
+        loadReport(false);
+        window.scrollTo({top: 0, behavior: 'smooth'});
+      };
+    });
+  } catch (e) {
+    $('#cards').innerHTML = '';
+    $('#body').innerHTML = `<section><div class="err"><b>เกิดข้อผิดพลาด</b><br>${e.message}</div></section>`;
+  }
+}
+
+async function loadAreas() {
+  try { AREAS = await api('/api/areas?profile=' + $('#selProfile').value); }
+  catch { AREAS = {}; }
+  ['selPv', 'selAmp', 'selHos'].forEach(id => $('#' + id).value = '');
+  refreshAreaSelects();
+}
+
+async function init() {
+  const profs = await api('/api/profiles');
+  $('#selProfile').innerHTML = profs.map(p =>
+    `<option value="${p.id}">${p.label}${p.files ? '' : '  (ยังไม่มีไฟล์ข้อมูล)'}</option>`).join('');
+  if (!profs.length) {
+    $('#body').innerHTML = '<section><div class="err">ไม่พบ profile ใน profiles/ — ' +
+      'กรุณาวางไฟล์ .yaml อย่างน้อย 1 ไฟล์</div></section>';
+    return;
+  }
+  await loadAreas();
+  await loadReport(false);
+}
+
+$('#selProfile').onchange = async () => { await loadAreas(); loadReport(false); };
+$('#selPv').onchange = () => { $('#selAmp').value=''; $('#selHos').value='';
+  refreshAreaSelects(); loadReport(false); };
+$('#selAmp').onchange = () => { $('#selHos').value=''; refreshAreaSelects(); loadReport(false); };
+$('#selHos').onchange = () => loadReport(false);
+$('#btnRefresh').onclick = async () => { await loadReport(true); await loadAreas(); };
+
+init();
+</script>
+</body>
+</html>

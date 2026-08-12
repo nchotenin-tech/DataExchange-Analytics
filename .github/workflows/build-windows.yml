@@ -1,0 +1,78 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags: ['v*']            # ติด tag เช่น v2.0.0 แล้วจะ build + สร้าง Release ให้เอง
+  workflow_dispatch:        # หรือกดสั่ง build เองจากหน้า Actions
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Sanity check (โหลด profile + คำนวณด้วยข้อมูลจำลอง)
+        run: python tools/smoke_test.py
+
+      - name: Build EXE
+        run: pyinstaller DentalDX.spec --noconfirm --clean
+
+      - name: Read version
+        id: ver
+        shell: bash
+        run: |
+          V=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"',open('app.py',encoding='utf-8').read()).group(1))")
+          echo "version=$V" >> $GITHUB_OUTPUT
+
+      - name: Package for distribution
+        shell: pwsh
+        run: |
+          $out = "package/DentalDX"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Move-Item dist/DentalDX.exe $out/
+          Copy-Item -Recurse profiles  $out/profiles
+          Copy-Item -Recurse reference $out/reference
+          Copy-Item README.md          $out/
+          Copy-Item docs/คู่มือผู้ใช้.txt $out/ -ErrorAction SilentlyContinue
+          python tools/make_data_dirs.py $out
+          Compress-Archive -Path $out -DestinationPath `
+            "DentalDX-v${{ steps.ver.outputs.version }}-win64.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DentalDX-win64
+          path: DentalDX-v${{ steps.ver.outputs.version }}-win64.zip
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: DentalDX-v${{ steps.ver.outputs.version }}-win64.zip
+          generate_release_notes: true
+          body: |
+            ## วิธีใช้
+
+            1. ดาวน์โหลด `DentalDX-v${{ steps.ver.outputs.version }}-win64.zip` แล้วแตกไฟล์
+            2. วางไฟล์ข้อมูล `.xlsx` จาก HDC ลงในโฟลเดอร์ `data/<กลุ่มอายุ>/`
+            3. ดับเบิลคลิก `DentalDX.exe` — เบราว์เซอร์จะเปิดขึ้นเอง
+
+            ไม่ต้องติดตั้ง Python ไม่ต้องต่ออินเทอร์เน็ต ข้อมูลไม่ออกจากเครื่อง
+
+            > Windows อาจเตือน "Windows protected your PC" เพราะไฟล์ยังไม่ได้เซ็นใบรับรอง
+            > กด **More info → Run anyway**
