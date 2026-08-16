@@ -72,6 +72,22 @@ a.dl.sm{font-size:11.5px;padding:5px 11px;font-weight:600}
 .c-sun .v{color:var(--sun)} .c-lav .v{color:var(--lav)}
 .c-teal .v{color:#0d9488} .c-indigo .v{color:#4f46e5}
 
+/* ---------- แถบเลือกรายงาน ---------- */
+.tabbar{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px;margin-bottom:6px}
+button.tab{flex:0 0 auto;font-family:inherit;text-align:left;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:9px 15px;min-width:132px;color:var(--ink2);box-shadow:var(--sh);
+  transition:transform .12s,box-shadow .12s}
+button.tab b{display:block;font-size:13px;font-weight:700;color:var(--ink);line-height:1.3}
+button.tab span{display:block;font-size:11px;color:var(--muted);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+button.tab:hover{transform:translateY(-1px);border-color:#bcdcf5}
+button.tab.on{background:linear-gradient(160deg,#2f9fdc,#4f46e5);border-color:transparent;
+  box-shadow:0 4px 14px rgba(47,110,220,.35)}
+button.tab.on b{color:#fff}
+button.tab.on span{color:#dbe9fb}
+.pane[hidden]{display:none}
+
 section{background:var(--panel);border-radius:var(--r);padding:20px 22px;margin-bottom:20px;box-shadow:var(--sh)}
 section h2{font-size:15.5px;margin:0 0 4px;display:flex;align-items:baseline;gap:8px}
 section h2 .no{background:var(--sky);color:#fff;border-radius:7px;font-size:11.5px;
@@ -107,6 +123,9 @@ td.pct{color:var(--sky);font-weight:600}
 button.mini{font-family:inherit;font-size:11.5px;padding:4px 10px;border-radius:8px;
   border:1px solid #cfe6f7;background:#f2f9fe;color:#2f6fa8;cursor:pointer;white-space:nowrap}
 button.mini:hover{background:#2f9fdc;color:#fff;border-color:#2f9fdc}
+button.mini.back{font-size:12px;padding:5px 12px;font-weight:600;flex:0 0 auto;
+  border-color:#bcdcf5;background:#eaf5fd;color:#1b5fbe}
+button.mini.back:hover{background:#1b5fbe;color:#fff;border-color:#1b5fbe}
 button.mini.warn{border-color:#f6d6a8;background:#fef6ea;color:#b8770f}
 button.mini.warn:hover{background:#f5a623;color:#fff;border-color:#f5a623}
 button.mini + button.mini{margin-left:5px}
@@ -180,10 +199,22 @@ a.dl:hover{background:#eaf5fd}
 a.dl.primary{background:#1cbfa0;border-color:#1cbfa0;color:#fff}
 a.dl.primary:hover{background:#16a88c}
 .mbody{overflow:auto;padding:0 20px 20px}
-.mbody table{white-space:nowrap}
+.mbody table{white-space:nowrap;font-size:12.5px}
+.mbody th,.mbody td{padding:5px 9px}
 .mbody th{top:0;background:#f5fafe}
-.mbody td:first-child,.mbody th:first-child{position:static}
-.note{font-size:11.5px;color:var(--muted);padding:10px 0 6px}
+/* คอลัมน์กลุ่มต่าง ๆ ใช้สีพื้นแยกให้ดูออกว่าเป็นค่าดิบหรือค่าที่คำนวณ */
+.mbody th.c-raw{background:#fdf6ec}  .mbody td.c-raw{background:#fffcf6}
+.mbody th.c-calc{background:#eef7f4} .mbody td.c-calc{background:#f7fdfb}
+.mbody tbody tr:hover td{background:#eaf5ff}
+.note{font-size:11.5px;color:var(--muted);padding:10px 0 6px;line-height:1.7}
+.lgd{margin-left:8px}
+.lgd i{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 4px 0 10px;
+  vertical-align:-1px;border:1px solid var(--line)}
+.lgd i.s-main{background:#fff} .lgd i.s-raw{background:#fdf6ec}
+.lgd i.s-calc{background:#eef7f4}
+label.chk{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2);
+  white-space:nowrap;cursor:pointer;user-select:none}
+label.chk input{cursor:pointer;accent-color:var(--sky);width:15px;height:15px}
 
 tr.clickable{cursor:pointer}
 tr.clickable:hover td{background:#eaf5ff}
@@ -270,6 +301,10 @@ td.pct2{color:#0d9488;font-weight:600}
     </header>
     <div class="bar">
       <input id="mSearch" type="search" placeholder="ค้นหา ชื่อ / PID / บ้านเลขที่ / ตำบล…">
+      <label class="chk"><input type="checkbox" id="mRaw" checked>
+        ฟิลด์ต้นฉบับ</label>
+      <label class="chk"><input type="checkbox" id="mCalc" checked>
+        ค่าที่ระบบคำนวณ</label>
       <a id="mCsv" class="dl">⬇ CSV</a>
       <a id="mXlsx" class="dl primary">⬇ Excel</a>
     </div>
@@ -349,6 +384,24 @@ function kpiCards(s) {
 
 function isPct(col) { return col.includes('ร้อยละ'); }
 
+// ---------- แท็บรายงาน ----------
+let ACTIVE_TAB = 'overview';
+
+function shortTitle(s) {
+  const t = String(s || '').replace(/\s*\(.*?\)\s*$/, '');
+  return t.length > 26 ? t.slice(0, 25) + '…' : t;
+}
+
+function selectTab(id) {
+  ACTIVE_TAB = id;
+  $('#body').querySelectorAll('.pane').forEach(p => {
+    p.hidden = p.dataset.tab !== id;
+  });
+  $('#body').querySelectorAll('button.tab').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === id);
+  });
+}
+
 // ปุ่มส่งออกของแต่ละตาราง (which = 'overview' | เลขตาราง | 'all')
 function exportBtns(which) {
   const q = new URLSearchParams({profile: $('#selProfile').value,
@@ -397,7 +450,7 @@ function renderTable(t) {
   return `<section>
     <h2><span class="no">ตารางที่ ${t.no}</span> ${t.title}
       ${ins ? `<button class="mini insbtn on" data-toggle="ins">✕ ซ่อนสรุป</button>` : ''}
-      ${chart ? `<button class="mini chartbtn" data-toggle="chart">📊 ดูกราฟ</button>` : ''}
+      ${chart ? `<button class="mini chartbtn on" data-toggle="chart">✕ ซ่อนกราฟ</button>` : ''}
       ${exportBtns(t.no)}</h2>
     <div class="cond">${(t.conditions || []).map(c => `<div>• ${c}</div>`).join('')}</div>
     ${ins}${chart}
@@ -409,13 +462,14 @@ function renderTable(t) {
 const esc = s => String(s).replace(/[&<>"]/g, c =>
   ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
+// สีทึบล้วน ไม่ใช้ gradient — อ่านง่ายกว่าและพิมพ์ออกมาไม่เพี้ยน
 const PALETTE = [
-  {c1: '#7dd3fc', c2: '#0284c7', ink: '#0369a1'},
-  {c1: '#5eead4', c2: '#0d9488', ink: '#0f766e'},
-  {c1: '#a5b4fc', c2: '#4f46e5', ink: '#4338ca'},
-  {c1: '#fcd34d', c2: '#d97706', ink: '#b45309'},
-  {c1: '#fda4af', c2: '#e11d48', ink: '#be123c'},
-  {c1: '#d8b4fe', c2: '#7c3aed', ink: '#6d28d9'},
+  {c: '#2f9fdc', ink: '#0369a1'},
+  {c: '#14b8a6', ink: '#0f766e'},
+  {c: '#6366f1', ink: '#4338ca'},
+  {c: '#f59e0b', ink: '#b45309'},
+  {c: '#ef4444', ink: '#be123c'},
+  {c: '#a855f7', ink: '#6d28d9'},
 ];
 
 let CHART_SEQ = 0;
@@ -437,15 +491,16 @@ function groupedBarChart(rows, series, opt) {
     const all = rows.flatMap(r => series.map(s => r[s.key])).filter(v => typeof v === 'number');
     max = niceMax(Math.max(...all, 0));
   }
-  const dec = o.dec !== null ? o.dec : (max <= 5 ? 2 : max <= 20 ? 1 : 0);
+  // ร้อยละและค่าเฉลี่ยแสดงทศนิยม 1 ตำแหน่งเสมอ
+  const dec = o.dec !== null ? o.dec : 1;
 
-  const slot = Math.max(o.slotMin, 14 * series.length + 26, 900 / n);
+  const slot = Math.max(o.slotMin, 16 * series.length + 30, 900 / n);
   const w = o.padL + o.padR + slot * n;
   const plotH = o.h - o.padT - o.padB;
   const y = v => o.padT + plotH * (1 - Math.max(0, Math.min(max, v || 0)) / max);
-  const bw = Math.min(22, (slot - 14) / series.length);
+  const bw = Math.min(24, (slot - 14) / series.length);
   const gap = series.length > 4 ? 2 : 3;
-  const showVal = n * series.length <= 30;
+  const vertical = bw < 20;          // แท่งแคบ -> วางตัวเลขแนวตั้งกันเลขชนกัน
 
   const grid = [0, .25, .5, .75, 1].map(f => {
     const v = max * f;
@@ -453,7 +508,7 @@ function groupedBarChart(rows, series, opt) {
           stroke="var(--line)" stroke-width="1"/>
     <text x="${o.padL - 8}" y="${y(v) + 4}" text-anchor="end"
           font-size="10.5" fill="var(--muted)">${
-            max <= 5 ? v.toFixed(2) : max <= 20 ? v.toFixed(1) : v.toFixed(0)}</text>`;
+            max <= 5 ? v.toFixed(1) : v.toFixed(0)}</text>`;
   }).join('');
 
   const bars = rows.map((r, i) => {
@@ -464,12 +519,16 @@ function groupedBarChart(rows, series, opt) {
       if (typeof v !== 'number') return '';
       const x = cx - total / 2 + k * (bw + gap);
       const yy = y(v), hh = o.padT + plotH - yy;
+      const cxb = x + bw / 2, txt = v.toFixed(dec);
+      const label = vertical
+        ? `<text transform="translate(${cxb},${yy - 5}) rotate(-90)" text-anchor="start"
+             font-size="9" fill="${s.ink}" font-weight="700">${txt}</text>`
+        : `<text x="${cxb}" y="${yy - 5}" text-anchor="middle"
+             font-size="9.5" fill="${s.ink}" font-weight="700">${txt}</text>`;
       return `<g class="gb">
         <rect x="${x}" y="${yy}" width="${bw}" height="${Math.max(1, hh)}"
-              rx="4" fill="url(#${o.uid}g${k})"><title>${esc(r.name)}
-${s.label}: ${v}${o.suffix}</title></rect>
-        ${showVal ? `<text x="${x + bw / 2}" y="${yy - 4}" text-anchor="middle"
-              font-size="9.5" fill="${s.ink}" font-weight="600">${v.toFixed(dec)}</text>` : ''}
+              rx="3" fill="${s.c}"><title>${esc(r.name)}
+${s.label}: ${txt}${o.suffix}</title></rect>${label}
       </g>`;
     }).join('');
   }).join('');
@@ -484,19 +543,12 @@ ${s.label}: ${v}${o.suffix}</title></rect>
           text-anchor="end" font-size="10.5" fill="var(--ink2)" class="xl">${esc(nm)}</text>`;
   }).join('');
 
-  const defs = series.map((s, k) => `
-    <linearGradient id="${o.uid}g${k}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${s.c1}"/><stop offset="100%" stop-color="${s.c2}"/>
-    </linearGradient>`).join('');
-
-  const legend = series.map(s => `
-    <span class="lg"><i style="background:linear-gradient(180deg,${s.c1},${s.c2})"></i>${s.label}</span>`
-  ).join('');
+  const legend = series.map(s =>
+    `<span class="lg"><i style="background:${s.c}"></i>${s.label}</span>`).join('');
 
   return `<div class="legend">${legend}</div>
     <div class="chartwrap"><svg viewBox="0 0 ${w} ${o.h}" width="${w}" height="${o.h}"
-      preserveAspectRatio="xMinYMin meet"><defs>${defs}</defs>
-      ${grid}${bars}${labels}</svg></div>`;
+      preserveAspectRatio="xMinYMin meet">${grid}${bars}${labels}</svg></div>`;
 }
 
 // ---------- สรุปประเด็น (insight) ----------
@@ -531,7 +583,7 @@ function tableChart(t) {
   const series = names.map((n, i) => ({
     key: pct ? `${n}|ร้อยละ` : n, label: n, ...PALETTE[i % PALETTE.length]}));
 
-  return `<div class="tchart" hidden>
+  return `<div class="tchart">
     <div class="ctitle">${esc(t.row_label || '')} × ${pct ? 'ร้อยละ' : 'ค่าเฉลี่ยต่อคน'}</div>
     ${groupedBarChart(rows, series, {uid, h: 300, padB: 44, flatLabels: true,
       max: pct ? 100 : null, suffix: pct ? '%' : '', slotMin: 70})}
@@ -548,10 +600,8 @@ function renderOverview(rows, labels, level) {
   const unitName = isDistrict ? 'อำเภอ' : 'หน่วยบริการ';
 
   const series = [
-    {key: 'examined_pct', label: 'ร้อยละได้รับการตรวจฟัน',
-     c1: '#5eead4', c2: '#0d9488', ink: '#0f766e'},
-    {key: 'caries_free_pct', label: 'ร้อยละ' + cfL,
-     c1: '#a5b4fc', c2: '#4f46e5', ink: '#4338ca'},
+    {key: 'examined_pct', label: 'ร้อยละได้รับการตรวจฟัน', c: '#14b8a6', ink: '#0f766e'},
+    {key: 'caries_free_pct', label: 'ร้อยละ' + cfL, c: '#6366f1', ink: '#4338ca'},
   ];
 
   const tb = rows.map(r => `<tr class="${isDistrict ? 'clickable' : ''}"
@@ -578,7 +628,9 @@ function renderOverview(rows, labels, level) {
   const allLabel = isDistrict ? 'ทั้งหมดในขอบเขตนี้' : 'ทั้งอำเภอ';
 
   return `<section>
-    <h2><span class="no">ภาพรวม</span> เปรียบเทียบราย${unitName} (เรียงตามรหัส${unitName})
+    <h2>${isDistrict ? '<span class="no">ภาพรวม</span>'
+        : `<button class="mini back" id="btnBack">← กลับระดับอำเภอ</button>`}
+      เปรียบเทียบราย${unitName} (เรียงตามรหัส${unitName})
       <span class="hgrp">
       ${totalPending > 0 ? `<button class="mini" data-name="${allLabel}" data-kind="pending"
         >ยังไม่ได้ตรวจ${allLabel} (${fmt(totalPending)})</button>` : ''}
@@ -592,8 +644,8 @@ function renderOverview(rows, labels, level) {
       <div>• คอลัมน์ <b>ติดตาม</b> (ขวาสุดของตาราง): <b>ยังไม่ได้ตรวจ</b> = ยังไม่มีวันที่ตรวจ |
         <b>ไม่ผ่านเกณฑ์</b> = ตรวจแล้วแต่ข้อมูลตกเกณฑ์คุณภาพ ควรตามมาตรวจ/บันทึกใหม่</div></div>
     ${groupedBarChart(rows.filter(r => r.examined > 0), series,
-      {uid: 'ov_', max: 100, suffix: '%', dec: 0, h: isDistrict ? 300 : 320,
-       padB: isDistrict ? 92 : 130, slotMin: isDistrict ? 62 : 56})}
+      {uid: 'ov_', max: 100, suffix: '%', h: isDistrict ? 320 : 340,
+       padB: isDistrict ? 92 : 130, slotMin: isDistrict ? 70 : 66})}
     <div class="tw"><table><thead><tr>
       <th>${unitName}</th><th>เป้าหมาย (คน)</th><th>ตรวจ (คน)</th><th>%ตรวจ</th>
       <th>ผ่านเกณฑ์</th><th>%ผ่านเกณฑ์</th>
@@ -614,24 +666,40 @@ function pendingParams(o) {
   return q;
 }
 
+function visibleCols() {
+  const g = PENDING.groups || {};
+  const hide = new Set();
+  if (!$('#mRaw').checked) (g.raw || []).forEach(c => hide.add(c));
+  if (!$('#mCalc').checked) (g.calc || []).forEach(c => hide.add(c));
+  return (PENDING.columns || []).filter(c => !hide.has(c));
+}
+
 function renderPendingRows(filter) {
   const f = (filter || '').trim().toLowerCase();
-  const cols = PENDING.columns;
+  const all = PENDING.columns || [];
+  const cols = visibleCols();
+  const g = PENDING.groups || {};
+  const rawSet = new Set(g.raw || []), calcSet = new Set(g.calc || []);
   const rows = f ? PENDING.rows.filter(r =>
-    cols.some(c => String(r[c] ?? '').toLowerCase().includes(f))) : PENDING.rows;
+    all.some(c => String(r[c] ?? '').toLowerCase().includes(f))) : PENDING.rows;
   if (!rows.length) {
     $('#mBody').innerHTML = '<div class="msg">ไม่พบรายการ</div>';
     return;
   }
+  const cls = c => rawSet.has(c) ? ' class="c-raw"' : calcSet.has(c) ? ' class="c-calc"' : '';
   $('#mBody').innerHTML =
-    `<div class="note">แสดง ${rows.length.toLocaleString('th-TH')} รายการ` +
+    `<div class="note">แสดง ${rows.length.toLocaleString('th-TH')} รายการ · ` +
+    `${cols.length} คอลัมน์ ` +
+    `<span class="lgd"><i class="s-main"></i>สรุป <i class="s-raw"></i>ฟิลด์ต้นฉบับ ` +
+    `<i class="s-calc"></i>ค่าที่ระบบคำนวณ</span>` +
     (PENDING.total > PENDING.shown
-      ? ` (บนหน้าจอจำกัด ${PENDING.shown.toLocaleString('th-TH')} จากทั้งหมด ` +
-        `${PENDING.total.toLocaleString('th-TH')} — ไฟล์ที่ส่งออกได้ครบทุกรายการ)` : '') +
+      ? `<br>บนหน้าจอจำกัด ${PENDING.shown.toLocaleString('th-TH')} จากทั้งหมด ` +
+        `${PENDING.total.toLocaleString('th-TH')} รายการ — ไฟล์ที่ส่งออกครบทุกรายการ` : '') +
     '</div><div class="tw"><table><thead><tr>' +
-    cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>' +
+    cols.map(c => `<th${cls(c)}>${esc(c)}</th>`).join('') + '</tr></thead><tbody>' +
     rows.map(r => '<tr>' + cols.map(c =>
-      `<td>${r[c] === null || r[c] === undefined ? '–' : esc(r[c])}</td>`).join('') + '</tr>').join('') +
+      `<td${cls(c)}>${r[c] === null || r[c] === undefined ? '–' : esc(r[c])}</td>`
+    ).join('') + '</tr>').join('') +
     '</tbody></table></div>';
 }
 
@@ -668,6 +736,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') $('#modal').hidden = true;
 });
 $('#mSearch').oninput = e => renderPendingRows(e.target.value);
+$('#mRaw').onchange = $('#mCalc').onchange = () => renderPendingRows($('#mSearch').value);
 
 async function loadReport(refresh) {
   const p = $('#selProfile').value;
@@ -689,9 +758,37 @@ async function loadReport(refresh) {
     $('#topExport').innerHTML =
       `<a class="dl sm primary" href="/api/table.xlsx?${qa}"
           title="ทุกตารางในไฟล์เดียว แยกเป็นชีต">⬇ ส่งออกทุกตาราง (Excel)</a>`;
+
+    // ---- แบ่งเป็นแท็บ: ภาพรวม + รายงานทีละตาราง ----
     const areaRows = r.level === 'unit' ? r.units : r.districts;
-    $('#body').innerHTML = renderOverview(areaRows, r.overview_labels, r.level) +
-      r.tables.map(renderTable).join('');
+    const tabs = [{id: 'overview', label: 'ภาพรวม', sub: 'เปรียบเทียบพื้นที่'}]
+      .concat(r.tables.map(t => ({
+        id: 't' + t.no, label: 'ตารางที่ ' + t.no, sub: shortTitle(t.title)})));
+
+    $('#body').innerHTML =
+      `<div class="tabbar">${tabs.map(x =>
+        `<button class="tab" data-tab="${x.id}">
+           <b>${esc(x.label)}</b><span>${esc(x.sub)}</span></button>`).join('')}</div>
+       <div class="pane" data-tab="overview">
+         ${renderOverview(areaRows, r.overview_labels, r.level)}</div>` +
+      r.tables.map(t => `<div class="pane" data-tab="t${t.no}" hidden>
+         ${renderTable(t)}</div>`).join('');
+
+    // เลือกแท็บเดิมไว้ถ้ายังมีอยู่ (เช่นตอนเปลี่ยนพื้นที่)
+    if (!tabs.some(x => x.id === ACTIVE_TAB)) ACTIVE_TAB = 'overview';
+    $('#body').querySelectorAll('button.tab').forEach(b => {
+      b.onclick = () => selectTab(b.dataset.tab);
+    });
+    selectTab(ACTIVE_TAB);
+    // ปุ่มกลับจากระดับหน่วยบริการ -> ระดับอำเภอ
+    const back = $('#btnBack');
+    if (back) back.onclick = () => {
+      $('#selAmp').value = '';
+      $('#selHos').value = '';
+      refreshAreaSelects();
+      loadReport(false);
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    };
     // ปุ่มสลับกราฟ / สรุปประเด็น ของแต่ละตาราง
     const toggles = [['chartbtn', '.tchart', '📊 ดูกราฟ', '✕ ซ่อนกราฟ'],
                      ['insbtn', '.insight', '💡 สรุปประเด็น', '✕ ซ่อนสรุป']];
@@ -706,7 +803,7 @@ async function loadReport(refresh) {
       });
     });
     // ปุ่มดูเด็กที่ยังไม่ได้ตรวจฟัน
-    $('#body').querySelectorAll('button.mini:not(.chartbtn):not(.insbtn)').forEach(b => {
+    $('#body').querySelectorAll('button.mini[data-name]').forEach(b => {
       b.onclick = ev => {
         ev.stopPropagation();
         openPending({amp: b.dataset.amp, hos: b.dataset.hos, kind: b.dataset.kind},

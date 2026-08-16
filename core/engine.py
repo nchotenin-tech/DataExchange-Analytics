@@ -103,6 +103,7 @@ class Profile:
     bands: list[Band] = field(default_factory=list)
     quality_extra: dict[str, str] = field(default_factory=dict)
     overview: dict = field(default_factory=dict)
+    filename_columns: list[dict] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Profile":
@@ -119,6 +120,7 @@ class Profile:
                    for b in d.get("bands", []) or []],
             quality_extra=d.get("quality_extra", {}) or {},
             overview=d.get("overview", {}) or {},
+            filename_columns=d.get("filename_columns", []) or [],
             tables=[TableSpec.from_dict(t) for t in d.get("tables", [])],
         )
 
@@ -144,12 +146,16 @@ def quality_mask(df: pd.DataFrame, profile: Profile) -> pd.Series:
 # --------------------------------------------------------------------------- #
 
 def apply_scope(df: pd.DataFrame, profile: Profile) -> pd.DataFrame:
-    """กรองให้เหลือเฉพาะแถวที่ตรวจฟันและอยู่ในช่วงอายุของ profile"""
-    m = df["examined"]
+    """กรองให้เหลือเฉพาะแถวที่ตรวจฟันและอยู่ในช่วงอายุของ profile
+
+    หมายเหตุ: ต้อง .copy() ก่อนใช้ &= ไม่งั้นจะไปเขียนทับคอลัมน์ examined
+    ของ DataFrame ต้นทาง ทำให้ค่าที่คำนวณหลังจากนี้ผิดทั้งหมด
+    """
+    m = df["examined"].fillna(False).astype(bool).copy()
     if profile.row_filter:
         m &= bool_mask(df, profile.row_filter)
     age = df["age"]
-    m &= age.notna() & (age >= profile.age_min) & (age <= profile.age_max)
+    m &= (age.notna() & (age >= profile.age_min) & (age <= profile.age_max)).to_numpy()
     out = df[m].copy()
     out["age"] = out["age"].astype("Int64")
     if profile.bands:

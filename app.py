@@ -23,7 +23,7 @@ from core import service
 # PyInstaller: templates/static ถูก bundle ไว้ใน sys._MEIPASS
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "2.0.0"
+VERSION = "2.5.0"
 
 app = Flask(__name__,
             template_folder=os.path.join(BASE, "templates"),
@@ -195,6 +195,7 @@ def _people_df():
         pv=request.args.get("pv") or None,
         amp=request.args.get("amp") or None,
         hos=request.args.get("hos") or None,
+        raw=request.args.get("raw", "1") != "0",   # ค่าเริ่มต้น = แสดงฟิลด์ต้นฉบับด้วย
     )
     scope = (request.args.get("hos") or request.args.get("amp")
              or request.args.get("pv") or "ทั้งหมด")
@@ -208,13 +209,14 @@ def api_people():
     if not p:
         return jsonify({"error": "ไม่พบ profile"}), 404
     df, kind, _ = res
-    limit = int(request.args.get("limit", "1000"))
+    limit = int(request.args.get("limit", "500"))
     return jsonify({
         "kind": kind,
         "title": service.PERSON_KINDS[kind],
         "total": len(df),
         "shown": min(len(df), limit),
         "columns": list(df.columns),
+        "groups": service.person_column_groups(p, df),
         "rows": df.head(limit).where(df.notna(), None).to_dict("records"),
     })
 

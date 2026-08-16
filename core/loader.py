@@ -59,6 +59,43 @@ def _read_csv_any(path: str) -> pd.DataFrame:
     return pd.read_csv(path, dtype=str, encoding="utf-8", errors="replace")
 
 
+def apply_filename_rules(df: pd.DataFrame, specs: list[dict]) -> pd.DataFrame:
+    """สร้างคอลัมน์จาก "ชื่อไฟล์" ตามกฎที่กำหนดใน profile
+
+    ใช้กรณีที่ข้อมูลถูกแยกเป็นหลายไฟล์ตามกลุ่ม แต่ในไฟล์ไม่มีคอลัมน์บอกกลุ่ม
+    เช่น "data_exchange ตรวจฟัน 0-2 ปี.xlsx" -> agegroup = "a0-2"
+
+    specs = [{"column": "agegroup",
+              "rules": [{"contains": "0-2", "value": "a0-2"}, ...],
+              "default": None, "overwrite": False}]
+    """
+    if not specs or "_source_file" not in df.columns:
+        return df
+
+    df = df.copy()
+    src = df["_source_file"].astype("string").fillna("")
+
+    for spec in specs:
+        col = spec.get("column")
+        if not col:
+            continue
+        derived = pd.Series(spec.get("default"), index=df.index, dtype="object")
+        for rule in spec.get("rules", []) or []:
+            needle = str(rule.get("contains", ""))
+            if not needle:
+                continue
+            hit = src.str.contains(needle, case=False, regex=False, na=False)
+            derived = derived.mask(hit & derived.isna(), rule.get("value"))
+        derived = derived.astype("string")
+
+        if col in df.columns and not spec.get("overwrite", False):
+            # ไฟล์ที่มีคอลัมน์นี้อยู่แล้วให้ใช้ค่าเดิม เติมเฉพาะช่องที่ว่าง
+            df[col] = df[col].astype("string").fillna(derived)
+        else:
+            df[col] = derived
+    return df
+
+
 def normalize(df: pd.DataFrame) -> pd.DataFrame:
     """ทำให้ชื่อคอลัมน์และชนิดข้อมูลเป็นมาตรฐานเดียวกันทุกกลุ่มอายุ"""
     df = df.copy()

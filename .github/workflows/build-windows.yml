@@ -8,17 +8,28 @@ on:
 permissions:
   contents: write
 
+# โปรเจกต์นี้มีข้อความไทยเยอะ ต้องบังคับ UTF-8 ทุก step
+# ไม่งั้น console ของ Windows runner (cp1252) จะ UnicodeEncodeError
+env:
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: 'utf-8'
+
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
+
+      - name: Show environment
+        run: |
+          python -c "import sys;print('python',sys.version);print('stdout',sys.stdout.encoding)"
+          chcp
 
       - name: Install dependencies
         run: |
@@ -32,12 +43,19 @@ jobs:
       - name: Build EXE
         run: pyinstaller DentalDX.spec --noconfirm --clean
 
+      - name: Verify EXE exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/DentalDX.exe)) {
+            Write-Error "ไม่พบ dist/DentalDX.exe — PyInstaller ล้มเหลว"; exit 1
+          }
+          $mb = [math]::Round((Get-Item dist/DentalDX.exe).Length / 1MB, 1)
+          Write-Host "EXE size: $mb MB"
+
       - name: Read version
         id: ver
         shell: bash
-        run: |
-          V=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"',open('app.py',encoding='utf-8').read()).group(1))")
-          echo "version=$V" >> $GITHUB_OUTPUT
+        run: echo "version=$(python tools/version.py)" >> $GITHUB_OUTPUT
 
       - name: Package for distribution
         shell: pwsh
@@ -47,8 +65,11 @@ jobs:
           Move-Item dist/DentalDX.exe $out/
           Copy-Item -Recurse profiles  $out/profiles
           Copy-Item -Recurse reference $out/reference
+          Copy-Item -Recurse docs      $out/docs
           Copy-Item README.md          $out/
-          Copy-Item docs/คู่มือผู้ใช้.txt $out/ -ErrorAction SilentlyContinue
+          # ย้ายคู่มือแบบ .txt ขึ้นมาไว้ราก ให้เห็นตั้งแต่แตกไฟล์
+          # ใช้ wildcard เพราะชื่อไฟล์เป็นภาษาไทย เลี่ยงปัญหา encoding ใน YAML
+          Get-ChildItem "$out/docs" -Filter *.txt | Move-Item -Destination $out -Force
           python tools/make_data_dirs.py $out
           Compress-Archive -Path $out -DestinationPath `
             "DentalDX-v${{ steps.ver.outputs.version }}-win64.zip" -Force

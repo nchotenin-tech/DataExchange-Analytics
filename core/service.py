@@ -48,7 +48,7 @@ def _fingerprint(folder: str) -> str:
     return hashlib.md5("|".join(parts).encode()).hexdigest()[:12]
 
 
-CACHE_VERSION = "v2"
+CACHE_VERSION = "v3"
 
 # pyarrow (parquet) เร็วกว่าและไฟล์เล็กกว่า แต่ทำให้ exe ใหญ่ขึ้นมาก
 # ถ้าไม่มีก็ใช้ pickle ของ pandas แทน ผลลัพธ์เหมือนกัน
@@ -64,10 +64,23 @@ def _cache_read(path: str) -> pd.DataFrame:
 
 
 def _cache_write(df: pd.DataFrame, path: str) -> None:
-    if path.endswith(".parquet"):
-        df.to_parquet(path, index=False)
-    else:
-        df.to_pickle(path)
+    """เขียนแบบ atomic: เขียนไฟล์ชั่วคราวก่อนแล้วค่อยเปลี่ยนชื่อทับ
+
+    ถ้าเปิดโปรแกรมพร้อมกันหลายหน้าต่าง จะได้ไม่อ่านไฟล์ที่เขียนค้างอยู่
+    """
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        if path.endswith(".parquet"):
+            df.to_parquet(tmp, index=False)
+        else:
+            df.to_pickle(tmp)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def get_dataset(profile: Profile, refresh: bool = False) -> pd.DataFrame:
@@ -100,6 +113,8 @@ def get_dataset(profile: Profile, refresh: bool = False) -> pd.DataFrame:
                 pass
 
         df = loader.load_data(profile.data_folder)
+        # สร้างคอลัมน์จากชื่อไฟล์ก่อน (เช่น agegroup) แล้วค่อยคำนวณตามปกติ
+        df = loader.apply_filename_rules(df, profile.filename_columns)
         df = loader.attach_area(df, hospitals())
         df = derive.prepare(df)
         if profile.bands:
@@ -200,6 +215,9 @@ def _breakdown(pop: pd.DataFrame, profile: Profile, by: str,
 
     target = pop.groupby(by, dropna=False).size()
     examined = scoped.groupby(by, dropna=False).size()
+    # "ยังไม่ได้ตรวจ" = ไม่มี date_serv จริง ๆ
+    # (ไม่ใช่ เป้าหมาย - ตรวจแล้ว เพราะแถวที่ตรวจแล้วแต่อายุนอกช่วงจะถูกนับผิดฝั่ง)
+    not_exam = pop[~pop["examined"].fillna(False)].groupby(by, dropna=False).size()
     qualified = sq.groupby(by, dropna=False).size()
     cf = cf_flag.groupby(sq[by], dropna=False).sum() if len(sq) else pd.Series(dtype=float)
     dm = dmft_val.groupby(sq[by], dropna=False).sum() if len(sq) else pd.Series(dtype=float)
@@ -221,7 +239,7 @@ def _breakdown(pop: pd.DataFrame, profile: Profile, by: str,
             "name": str(info.get(name_col) or key or "ไม่ระบุ"),
             "target": t,
             "examined": e,
-            "pending": t - e,
+            "pending": int(not_exam.get(key, 0)),
             "failed": e - b,
             "examined_pct": round(100 * e / t, 2) if t else None,
             "qualified": b,
@@ -313,38 +331,95 @@ def _add_person_fields(out: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _select(out: pd.DataFrame, spec, sort_keys) -> pd.DataFrame:
+# คอลัมน์ที่ระบบเติมเข้ามาเอง (ไม่ได้มาจากไฟล์ต้นฉบับ)
+AREA_COLS = ["pvcode", "pvname", "ampcode", "ampname", "tumcode", "tumbonname",
+             "hostype", "hosname_ref"]
+CALC_COLS = ["age", "age_month", "band", "examined", "gum_status", "gum_label",
+             "gum_sx_0", "gum_sx_1", "gum_sx_2", "gum_sx_3", "gum_sx_9",
+             "dmft_p", "dmft_d"]
+# คอลัมน์ชั่วคราวที่สร้างใน person_list เอง
+TEMP_COLS = ["age_today", "birth_str", "date_str", "sex_label",
+             "provider_label", "fail_reason"]
+
+
+def raw_columns(df: pd.DataFrame) -> list[str]:
+    """ฟิลด์ต้นฉบับที่มาจากไฟล์ข้อมูลจริง ๆ (ตามลำดับในไฟล์)"""
+    skip = set(AREA_COLS) | set(CALC_COLS) | set(TEMP_COLS)
+    return [c for c in df.columns if not c.startswith("_") and c not in skip]
+
+
+def _select(out: pd.DataFrame, spec, sort_keys, raw: bool = False) -> pd.DataFrame:
     cols = [(c, t) for c, t in spec if c in out.columns]
-    res = out[[c for c, _ in cols]].rename(columns=dict(cols))
+
+    if raw:
+        # ต่อท้ายด้วยฟิลด์ต้นฉบับทั้งหมด + ค่าที่ระบบคำนวณ เพื่อให้ตรวจสอบย้อนได้
+        used = {c for c, _ in cols}
+        cols += [(c, c) for c in raw_columns(out)]
+        cols += [(c, c) for c in CALC_COLS if c in out.columns]
+        if "_source_file" in out.columns:
+            cols.append(("_source_file", "ไฟล์ต้นทาง"))
+        # กันชื่อคอลัมน์ซ้ำ (ไม่ใช่กันแหล่งข้อมูลซ้ำ) — ฟิลด์ต้นฉบับต้องโผล่ครบทุกตัว
+        # แม้ค่าจะซ้ำกับคอลัมน์สรุป เพราะจุดประสงค์คือตรวจสอบค่าดิบย้อนกลับ
+        seen, uniq = set(), []
+        for c, t in cols:
+            if t not in seen:
+                seen.add(t)
+                uniq.append((c, t))
+        cols = uniq
+
+    res = out[[c for c, _ in cols]].copy()
+    res.columns = [t for _, t in cols]
     order = [t for c, t in cols if c in sort_keys]
     if order:
         res = res.sort_values(order, na_position="last")
+
+    # คอลัมน์วันที่ดิบต้องแปลงเป็นข้อความก่อน ไม่งั้น JSON พังเมื่อเจอค่าว่าง (NaT)
+    for c in res.columns:
+        if pd.api.types.is_datetime64_any_dtype(res[c]):
+            fmt = "%Y-%m-%d %H:%M:%S" if c.lower() == "d_update" else "%Y-%m-%d"
+            res[c] = res[c].dt.strftime(fmt)
     return res.reset_index(drop=True)
 
 
 def fail_reasons(df: pd.DataFrame, profile: Profile) -> pd.Series:
-    """ข้อความบอกว่าตกเกณฑ์ข้อไหนบ้าง (คั่นด้วย ' + ')"""
+    """ข้อความบอกว่าตกเกณฑ์ข้อไหนบ้าง (คั่นด้วย ' + ')
+
+    ทำงานบน numpy array ตรง ๆ ไม่ผ่าน .map()/.apply()
+    เพราะถ้าเกณฑ์ข้อไหนไม่มีใครตกเลย pandas จะเปลี่ยน dtype เป็น float
+    ทำให้ค่า None กลายเป็น NaN (ซึ่งเป็น truthy) แล้ว join พัง
+    """
+    import numpy as np
+
     from .engine import bool_mask
-    parts = []
+
+    n = len(df)
+    default = "ไม่ผ่านเกณฑ์คุณภาพ"
+    if n == 0:
+        return pd.Series([], index=df.index, dtype="string")
+
+    checks = []
     for chk in profile.quality_checks:
         only = chk.get("bands")
-        applies = (df["band"].isin(only) if only and "band" in df.columns
-                   else pd.Series(True, index=df.index))
-        fail = (~bool_mask(df, chk["expr"])) & applies
-        parts.append(fail.map(lambda x, n=chk["name"]: n if x else None))
-    if not parts:
-        return pd.Series("ไม่ผ่านเกณฑ์คุณภาพ", index=df.index)
-    joined = pd.concat(parts, axis=1).apply(
-        lambda r: " + ".join([v for v in r if v]) or "ไม่ผ่านเกณฑ์คุณภาพ", axis=1)
-    return joined
+        applies = (df["band"].isin(only).to_numpy(dtype=bool)
+                   if only and "band" in df.columns else np.ones(n, dtype=bool))
+        fail = (~bool_mask(df, chk["expr"]).to_numpy(dtype=bool)) & applies
+        checks.append((str(chk["name"]), fail))
+
+    if not checks:
+        return pd.Series([default] * n, index=df.index, dtype="string")
+
+    texts = [" + ".join(name for name, fail in checks if fail[i]) or default
+             for i in range(n)]
+    return pd.Series(texts, index=df.index, dtype="string")
 
 
 def person_list(profile: Profile, kind: str = "pending",
-                pv=None, amp=None, hos=None) -> pd.DataFrame:
+                pv=None, amp=None, hos=None, raw: bool = False) -> pd.DataFrame:
     """รายชื่อเด็กสำหรับติดตาม
 
     kind='pending' = ยังไม่มี date_serv (ยังไม่ได้ตรวจ)
     kind='failed'  = ตรวจแล้วแต่ไม่ผ่านเกณฑ์คุณภาพ -> ควรตามมาตรวจใหม่
+    raw=True       = ต่อท้ายด้วยฟิลด์ต้นฉบับทุกคอลัมน์ สำหรับตรวจสอบย้อนกลับ
     """
     df = filter_area(get_dataset(profile), pv, amp, hos)
 
@@ -356,10 +431,22 @@ def person_list(profile: Profile, kind: str = "pending",
         else:
             out["fail_reason"] = pd.Series(dtype="object")
         out = _add_person_fields(out)
-        return _select(out, FAILED_COLS, {"hoscode", "date_serv", "age"})
+        return _select(out, FAILED_COLS, {"hoscode", "date_serv", "age"}, raw)
 
     out = _add_person_fields(df[~df["examined"].fillna(False)].copy())
-    return _select(out, PENDING_COLS, {"hoscode", "age_today", "birth_str"})
+    return _select(out, PENDING_COLS, {"hoscode", "age_today", "birth_str"}, raw)
+
+
+def person_column_groups(profile: Profile, result: pd.DataFrame) -> dict:
+    """แบ่งคอลัมน์ของผลลัพธ์เป็น 3 กลุ่ม ให้หน้าเว็บสลับซ่อน/แสดงได้"""
+    rawset = set(raw_columns(get_dataset(profile)))
+    calcset = set(CALC_COLS)
+    cols = list(result.columns)
+    return {
+        "main": [c for c in cols if c not in rawset and c not in calcset],
+        "raw": [c for c in cols if c in rawset],
+        "calc": [c for c in cols if c in calcset],
+    }
 
 
 def pending(profile: Profile, pv=None, amp=None, hos=None) -> pd.DataFrame:
@@ -374,6 +461,9 @@ def report(profile: Profile, pv=None, amp=None, hos=None, refresh=False) -> dict
     s = summary(scoped, profile)
     s["target"] = len(pop)
     s["examined_pct"] = round(100 * len(scoped) / len(pop), 2) if len(pop) else None
+    s["pending"] = int((~pop["examined"].fillna(False)).sum())
+    # แถวที่ตรวจแล้วแต่อายุอยู่นอกช่วงของ profile (ไม่นับเป็นทั้งตรวจแล้วและยังไม่ตรวจ)
+    s["out_of_range"] = len(pop) - len(scoped) - s["pending"]
 
     tables = build_report(scoped, profile)
     for t in tables:

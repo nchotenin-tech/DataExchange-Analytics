@@ -1,0 +1,22 @@
+# ค่าเริ่มต้น: normalize เป็น LF ในคลัง
+* text=auto eol=lf
+
+# ไฟล์ batch ของ Windows ต้องเป็น CRLF เสมอ ไม่งั้น cmd.exe ทำงานเพี้ยน
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ไฟล์อ้างอิงเป็น TIS-620/CP874 ห้าม git แตะ ไม่งั้น diff บวมและอาจเสียหาย
+reference/*.csv -text
+
+# ไฟล์ไบนารี
+*.xlsx binary
+*.xls  binary
+*.parquet binary
+*.pkl  binary
+*.png  binary
+*.ico  binary
+
+# ไม่ต้องนับเป็นโค้ดในสถิติภาษาของ GitHub
+docs/**   linguist-documentation
+*.md      linguist-documentation

@@ -13,6 +13,14 @@ import pandas as pd
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+# console ของ Windows (และ GitHub Actions runner) มักเป็น cp1252/cp874
+# พิมพ์ภาษาไทยแล้ว UnicodeEncodeError -> สคริปต์ตายทั้งที่โปรแกรมไม่ได้พัง
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def fake_rows(n=400, seed=7):
     import random
@@ -61,11 +69,32 @@ def main() -> int:
     assert profs, "ไม่พบ profile ในโฟลเดอร์ profiles/"
     print("profiles:", list(profs))
 
+    from core.engine import apply_scope
+
     ok = 0
     for pid, p in profs.items():
         os.makedirs(p.data_folder, exist_ok=True)
-        fake_rows().to_excel(os.path.join(p.data_folder, "smoke.xlsx"), index=False)
+
+        # profile ที่สร้างคอลัมน์จากชื่อไฟล์ -> สร้างไฟล์ตามกฎเพื่อทดสอบจริง
+        rules = [r for spec in p.filename_columns for r in spec.get("rules", [])]
+        if rules:
+            for i, rule in enumerate(rules):
+                name = f"smoke {rule['contains']} .xlsx"
+                fake_rows(seed=7 + i).to_excel(os.path.join(p.data_folder, name), index=False)
+        else:
+            fake_rows().to_excel(os.path.join(p.data_folder, "smoke.xlsx"), index=False)
+
         rep = service.report(p, refresh=True)
+
+        for spec in p.filename_columns:
+            col = spec["column"]
+            df = service.get_dataset(p)
+            assert col in df.columns, f"{pid}: ไม่ได้สร้างคอลัมน์ {col} จากชื่อไฟล์"
+            got = set(df[col].dropna().unique())
+            want = {r["value"] for r in spec.get("rules", [])}
+            assert got == want, f"{pid}: {col} ได้ {got} แต่ควรเป็น {want}"
+            assert df[col].isna().sum() == 0, f"{pid}: {col} มีค่าว่าง"
+            print(f"  {pid}: {col} จากชื่อไฟล์ -> {sorted(got)} ✓")
         s = rep["summary"]
         assert s["target"] > 0, f"{pid}: ไม่มีข้อมูลเป้าหมาย"
         assert rep["tables"], f"{pid}: ไม่มีตาราง"
@@ -75,8 +104,44 @@ def main() -> int:
         # ส่งออกได้จริง
         from core import export
         assert export.xlsx_bytes(export.report_sheets(rep))[:2] == b"PK", "สร้าง xlsx ไม่ได้"
-        assert len(service.person_list(p, "pending")) >= 0
-        assert len(service.person_list(p, "failed")) >= 0
+        # รายชื่อเด็ก — ต้องได้ครบและยอดต้องตรงกับสรุป
+        pend = service.person_list(p, "pending")
+        fail = service.person_list(p, "failed")
+        assert len(pend) == s["pending"], f"{pid}: ยอดยังไม่ได้ตรวจไม่ตรงกับสรุป"
+        assert len(fail) == s["examined"] - s["qualified"], f"{pid}: ยอดตกเกณฑ์ไม่ตรง"
+        assert s["target"] == s["examined"] + s["pending"] + s["out_of_range"], \
+            f"{pid}: ยอดรวมไม่ลงตัว"
+
+        # ตัวเลขบนปุ่มต้องเท่ากับจำนวนรายชื่อที่เปิดดูได้จริง
+        rows = rep["units"] if rep.get("level") == "unit" else rep["districts"]
+        assert sum(r["pending"] for r in rows) == len(pend), \
+            f"{pid}: ปุ่ม 'ยังไม่ได้ตรวจ' ไม่ตรงกับรายชื่อ"
+        assert sum(r["failed"] for r in rows) == len(fail), \
+            f"{pid}: ปุ่ม 'ไม่ผ่านเกณฑ์' ไม่ตรงกับรายชื่อ"
+
+        # apply_scope ต้องไม่แก้ข้อมูลต้นทาง
+        # (เคยใช้ m = df["examined"] แล้ว m &= ... ซึ่งเขียนทับคอลัมน์จริง
+        #  ทำให้ยอด "ยังไม่ได้ตรวจ" ผิดแบบเงียบ ๆ)
+        base = service.get_dataset(p)
+        before = int(base["examined"].sum())
+        apply_scope(base, p)
+        assert int(base["examined"].sum()) == before, \
+            f"{pid}: apply_scope ไปแก้คอลัมน์ examined ของข้อมูลต้นทาง"
+
+        # ไล่ทีละหน่วยบริการ: ครอบคลุมกรณีที่บางหน่วยตกเกณฑ์เพียงข้อเดียว
+        # (เคยทำให้ fail_reasons พังเพราะ pandas เปลี่ยน None -> NaN)
+        df = service.get_dataset(p)
+        kinds = set()
+        for hos in df["hoscode"].dropna().unique():
+            sub = service.person_list(p, "failed", hos=hos)
+            if len(sub):
+                col = sub["สาเหตุที่ไม่ผ่านเกณฑ์"]
+                assert col.notna().all(), f"{pid}/{hos}: สาเหตุที่ไม่ผ่านเกณฑ์มีค่าว่าง"
+                assert col.map(lambda v: isinstance(v, str)).all(), \
+                    f"{pid}/{hos}: สาเหตุที่ไม่ผ่านเกณฑ์ไม่ใช่ข้อความ"
+                kinds |= set(col)
+        if len(fail):
+            print(f"  {pid}: สาเหตุที่พบ {sorted(kinds)} ✓")
         print(f"  {pid}: เป้าหมาย {s['target']} ตรวจ {s['examined']} "
               f"ผ่านเกณฑ์ {s['qualified']} ตาราง {len(rep['tables'])} ✓")
         ok += 1
