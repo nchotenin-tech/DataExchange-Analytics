@@ -72,6 +72,33 @@ a.dl.sm{font-size:11.5px;padding:5px 11px;font-weight:600}
 .c-sun .v{color:var(--sun)} .c-lav .v{color:var(--lav)}
 .c-teal .v{color:#0d9488} .c-indigo .v{color:#4f46e5}
 
+/* ---------- หน้าสำรวจข้อมูล (EDA) ---------- */
+.hint2{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.hint3{font-size:11px;color:var(--muted)}
+td.warnval{color:#dc2626;font-weight:700}
+td.barcell{width:1%;padding-right:14px}
+.pb{display:block;width:100%;min-width:90px;height:8px;border-radius:4px;
+  background:#eef2f6;overflow:hidden}
+.pb i{display:block;height:100%;border-radius:4px;background:var(--sky)}
+.pb i.ok{background:#16a34a} .pb i.mid{background:#f59e0b} .pb i.low{background:#ef4444}
+td.boxcell{padding:2px 8px}
+svg.box{display:block}
+.spark{display:inline-flex;align-items:flex-end;gap:1px;height:30px;min-width:96px}
+.spark i{display:block;width:6px;background:#93c5fd;border-radius:2px 2px 0 0}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.ccard{border:1px solid var(--line);border-radius:var(--r2);padding:11px 13px;background:#fbfdff}
+.chead{font-size:12.5px;color:var(--ink);margin-bottom:6px}
+.chead span{color:var(--muted);font-size:11px;margin-left:4px}
+.chead em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:1px}
+.ccard table{font-size:12px}
+.ccard td{padding:3px 6px;border-bottom:1px solid #eef4f9}
+.ccard td.cv{font-weight:600;color:var(--ink2);white-space:nowrap}
+.ccard td.cl{color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.ccard td.cn{text-align:right;white-space:nowrap}
+.ccard td.cp{text-align:right;color:var(--sky);font-weight:600;white-space:nowrap}
+td.hm{text-align:center;font-weight:700;font-size:12.5px;min-width:96px}
+
 /* ---------- แถบเลือกรายงาน ---------- */
 .tabbar{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px;margin-bottom:6px}
 button.tab{flex:0 0 auto;font-family:inherit;text-align:left;cursor:pointer;
@@ -198,10 +225,60 @@ a.dl{font-size:12.5px;padding:8px 14px;border-radius:9px;text-decoration:none;
 a.dl:hover{background:#eaf5fd}
 a.dl.primary{background:#1cbfa0;border-color:#1cbfa0;color:#fff}
 a.dl.primary:hover{background:#16a88c}
-.mbody{overflow:auto;padding:0 20px 20px}
+/* ป๊อปอัพกราฟขนาดใหญ่ */
+.zsheet{width:min(1000px,100%)}
+.zbody{overflow:auto;padding:16px 22px 22px}
+.zbody svg{display:block;width:100%;height:auto}
+.zbody .bighist{margin-bottom:2px}
+.zbody .ztitle{font-size:12.5px;color:var(--muted);font-weight:600;margin:14px 0 4px}
+.zbody .zhelp{font-size:12px;color:var(--muted);line-height:1.8;margin-top:6px;
+  border-top:1px dashed var(--line);padding-top:10px}
+.zbody text.ax{font-size:11px;fill:#7b8b9a}
+.zbody text.vl{font-size:11px;fill:#3f6b93;font-weight:600}
+.zbody text.bl{font-size:12px;fill:#31536f;font-weight:600}
+.zbody text.bl.red{fill:#c0392b}
+.zstats{display:flex;flex-wrap:wrap;gap:8px}
+.zstats .st{flex:1 1 118px;background:#f6fafd;border:1px solid var(--line);
+  border-radius:10px;padding:8px 10px}
+.zstats .st b{display:block;font-size:14px;color:var(--ink)}
+.zstats .st span{font-size:11.5px;color:var(--muted)}
+.zstats .st.bad{background:#fff5f4;border-color:#f3cfc9}
+.zstats .st.bad b{color:#c0392b}
+.zstats .st.clk{cursor:pointer}
+.zstats .st.clk:hover{border-color:var(--sky);box-shadow:0 2px 8px rgba(47,111,168,.18)}
+.zstats .st em{display:block;font-size:10.5px;color:#2f6fa8;font-style:normal;margin-top:3px}
+.zstats .st.bad em{color:#c0392b}
+.zbody .zclick{font-weight:400;color:#2f6fa8;margin-left:8px}
+.zbody g.clkbar{cursor:pointer}
+.zbody g.clkbar:hover rect{fill:#3f8fd0}
+/* หน้าต่างรายชื่อเด็กต้องอยู่บนกราฟขยายเสมอ เพราะเปิดต่อจากกัน */
+#modal{z-index:220}
+tr.zoomrow{cursor:zoom-in}
+tr.zoomrow:hover td{background:#eff8ff}
+td.zoomcell{text-align:right;white-space:nowrap}
+.zbtn{font-size:11.5px;color:#2f6fa8;border:1px solid #cfe6f7;background:#fff;
+  border-radius:8px;padding:3px 9px}
+tr.zoomrow:hover .zbtn{background:#2f6fa8;border-color:#2f6fa8;color:#fff}
+
+/* ตารางรายบุคคลกว้าง 70+ คอลัมน์ ยาวหลักพันแถว
+   ต้องให้กล่อง .tw เป็นตัวเลื่อนเพียงตัวเดียว (ไม่ใช่ .mbody)
+   ไม่งั้นหัวตารางไม่ยึดติด และแถบเลื่อนแนวนอนจะไปอยู่ใต้แถวสุดท้ายจนกดไม่ถึง */
+.mbody{flex:1;min-height:0;display:flex;flex-direction:column;
+  overflow:hidden;padding:0 20px 16px}
+.mbody .tw{flex:1;min-height:0;overflow:auto}
 .mbody table{white-space:nowrap;font-size:12.5px}
 .mbody th,.mbody td{padding:5px 9px}
-.mbody th{top:0;background:#f5fafe}
+.mbody th{position:sticky;top:0;z-index:2;background:#f5fafe;
+  box-shadow:0 1px 0 var(--line)}
+.mbody th:first-child{z-index:4}
+.mbody td:first-child{background:#fff}
+/* แถบเลื่อนให้เห็นชัด ไม่ใช่เส้นบางจนหาไม่เจอ */
+.mbody .tw::-webkit-scrollbar{width:14px;height:14px}
+.mbody .tw::-webkit-scrollbar-track{background:#eef4f9;border-radius:8px}
+.mbody .tw::-webkit-scrollbar-thumb{background:#9fbdd6;border-radius:8px;
+  border:3px solid #eef4f9}
+.mbody .tw::-webkit-scrollbar-thumb:hover{background:#7ba5c6}
+.mbody .tw{scrollbar-color:#9fbdd6 #eef4f9}
 /* คอลัมน์กลุ่มต่าง ๆ ใช้สีพื้นแยกให้ดูออกว่าเป็นค่าดิบหรือค่าที่คำนวณ */
 .mbody th.c-raw{background:#fdf6ec}  .mbody td.c-raw{background:#fffcf6}
 .mbody th.c-calc{background:#eef7f4} .mbody td.c-calc{background:#f7fdfb}
@@ -312,6 +389,20 @@ td.pct2{color:#0d9488;font-weight:600}
   </div>
 </div>
 
+<!-- ป๊อปอัพกราฟขนาดใหญ่ (คลิกจากตารางการกระจายของค่าตัวเลข) -->
+<div id="zmodal" class="modal" hidden>
+  <div class="sheet zsheet">
+    <header>
+      <div>
+        <b id="zTitle"></b>
+        <span id="zSub"></span>
+      </div>
+      <button id="zClose" class="x" title="ปิด">✕</button>
+    </header>
+    <div id="zBody" class="zbody"></div>
+  </div>
+</div>
+
 <script>
 const $ = s => document.querySelector(s);
 let AREAS = {}, CURRENT = null;
@@ -384,6 +475,283 @@ function kpiCards(s) {
 
 function isPct(col) { return col.includes('ร้อยละ'); }
 
+// ---------- สำรวจข้อมูล (EDA) ----------
+let EDA_CACHE = null, EDA_KEY = '', ZOOM = null;
+
+function pctBar(pct, tone) {
+  const w = Math.max(0, Math.min(100, pct || 0));
+  return `<span class="pb"><i class="${tone || ''}" style="width:${w}%"></i></span>`;
+}
+
+function edaAnomalies(a) {
+  const rows = a.rules.filter(r => r.count > 0);
+  const clean = a.rules.length - rows.length;
+  const body = rows.length ? rows.map(r => `<tr>
+      <td>${esc(r.name)}<span class="hint2">${esc(r.desc)}</span></td>
+      <td class="pct">${fmt(r.count)}</td>
+      <td>${fmt(r.pct, 2)}%</td>
+      <td class="barcell">${pctBar(Math.min(100, r.pct * 10), r.pct >= 1 ? 'low' : 'mid')}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:var(--mint)">ไม่พบค่าผิดปกติ ✔</td></tr>';
+  const tone = a.pct >= 5 ? 'bad' : a.pct >= 1 ? 'warn' : 'good';
+  return `<section>
+    <h2><span class="no">1</span> ค่าผิดปกติและข้อมูลขัดแย้งกันเอง</h2>
+    <div class="insight"><ul class="ilist">
+      <li class="t-${tone}"><b>${TONE_ICON[tone]}</b>พบแถวที่มีอย่างน้อย 1 ปัญหา
+        ${fmt(a.rows_with_issue)} จาก ${fmt(a.rows_total)} แถว (${fmt(a.pct, 2)}%)${
+        clean ? ` · ผ่านทุกเกณฑ์ ${clean} ข้อ` : ''}</li></ul></div>
+    <div class="tw"><table><thead><tr>
+      <th>ปัญหาที่ตรวจพบ</th><th>จำนวนแถว</th><th>ร้อยละ</th>
+      <th style="width:140px"></th></tr></thead><tbody>${body}</tbody></table></div>
+  </section>`;
+}
+
+function boxPlot(d) {
+  const W = 300, H = 44, padL = 10, padR = 10;
+  const lo = Math.min(d.min, d.whisker_lo), hi = Math.max(d.max, d.whisker_hi);
+  const span = (hi - lo) || 1;
+  const x = v => padL + (W - padL - padR) * (v - lo) / span;
+  const cy = H / 2;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="box">
+    <line x1="${x(d.whisker_lo)}" x2="${x(d.whisker_hi)}" y1="${cy}" y2="${cy}"
+          stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="${x(d.whisker_lo)}" x2="${x(d.whisker_lo)}" y1="${cy - 8}" y2="${cy + 8}"
+          stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="${x(d.whisker_hi)}" x2="${x(d.whisker_hi)}" y1="${cy - 8}" y2="${cy + 8}"
+          stroke="#94a3b8" stroke-width="1.5"/>
+    <rect x="${x(d.q1)}" y="${cy - 10}" width="${Math.max(1.5, x(d.q3) - x(d.q1))}"
+          height="20" rx="3" fill="#bfdbfe" stroke="#3b82f6"/>
+    <line x1="${x(d.median)}" x2="${x(d.median)}" y1="${cy - 10}" y2="${cy + 10}"
+          stroke="#1d4ed8" stroke-width="2.5"/>
+    ${d.outliers_hi ? `<circle cx="${x(d.max)}" cy="${cy}" r="3.5" fill="#ef4444"/>` : ''}
+    ${d.outliers_lo ? `<circle cx="${x(d.min)}" cy="${cy}" r="3.5" fill="#ef4444"/>` : ''}
+    <title>min ${d.min} · Q1 ${d.q1} · median ${d.median} · Q3 ${d.q3} · max ${d.max}</title>
+  </svg>`;
+}
+
+function miniHist(h) {
+  const max = Math.max(...h.map(b => b.count), 1);
+  return `<span class="spark">${h.map(b =>
+    `<i style="height:${Math.max(3, Math.round(100 * b.count / max))}%"
+        title="${b.from}–${b.to} : ${b.count.toLocaleString('th-TH')}"></i>`).join('')}</span>`;
+}
+
+function edaNumeric(list) {
+  if (!list.length) return '';
+  const body = list.map((d, i) => `<tr class="zoomrow" data-zoom="${i}"
+      title="คลิกเพื่อดูกราฟขนาดใหญ่">
+      <td>${esc(d.label)}<span class="hint2">${esc(d.column)}</span></td>
+      <td>${fmt(d.median, 1)}</td>
+      <td>${fmt(d.mean, 2)} <span class="hint3">±${fmt(d.sd, 2)}</span></td>
+      <td class="${d.min < 0 ? 'warnval' : ''}">${fmt(d.min, 0)}–${fmt(d.max, 0)}</td>
+      <td class="${d.outlier_pct >= 5 ? 'warnval' : ''}">${fmt(d.outlier_pct, 1)}%</td>
+      <td>${fmt(d.zero_pct, 1)}%</td>
+      <td class="boxcell">${boxPlot(d)}</td>
+      <td class="histcell">${miniHist(d.hist)}</td>
+      <td class="zoomcell"><span class="zbtn">🔍 ขยาย</span></td></tr>`).join('');
+  return `<section>
+    <h2><span class="no">2</span> การกระจายของค่าตัวเลข</h2>
+    <div class="cond">
+      <div>• คิดเฉพาะแถวที่ตรวจฟันและอยู่ในช่วงอายุของกลุ่มนี้</div>
+      <div>• กล่องฟ้า = ช่วง Q1–Q3 (ครึ่งกลางของข้อมูล) · เส้นเข้ม = มัธยฐาน ·
+        จุดแดง = มีค่าเกินหนวด 1.5 × IQR</div>
+      <div>• <b>คลิกที่แถวใดก็ได้เพื่อเปิดกราฟขนาดใหญ่</b></div>
+    </div>
+    <div class="tw"><table><thead><tr>
+      <th>ตัวแปร</th><th>มัธยฐาน</th><th>เฉลี่ย ± SD</th><th>ต่ำสุด–สูงสุด</th>
+      <th>%outlier</th><th>%เป็นศูนย์</th><th>Boxplot</th>
+      <th>Histogram</th><th></th></tr></thead><tbody>${body}</tbody></table></div>
+  </section>`;
+}
+
+// ---------- กราฟขนาดใหญ่ (คลิกจากตารางการกระจายของค่าตัวเลข) ----------
+// histogram กับ boxplot ใช้แกน X ร่วมกัน จึงอ่านคู่กันได้ว่ายอดไหนอยู่ในกล่อง Q1-Q3
+function bigChart(d) {
+  const W = 900, HH = 300, BH = 110, padL = 62, padR = 26, padT = 18;
+  const lo = Math.min(d.min, d.whisker_lo, d.hist[0].from);
+  const hi = Math.max(d.max, d.whisker_hi, d.hist[d.hist.length - 1].to);
+  const span = (hi - lo) || 1;
+  const x = v => padL + (W - padL - padR) * (v - lo) / span;
+  const maxC = Math.max(...d.hist.map(b => b.count), 1);
+  const y = c => padT + (HH - padT - 34) * (1 - c / maxC);
+  const base = HH - 34;
+
+  // แกน Y ของฮิสโทแกรม 4 ขีด
+  const yticks = [0, .25, .5, .75, 1].map(t => {
+    const c = maxC * t, yy = y(c);
+    return `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="#e8eef4"/>
+      <text x="${padL - 8}" y="${yy + 4}" text-anchor="end" class="ax">${
+        Math.round(c).toLocaleString('th-TH')}</text>`;
+  }).join('');
+
+  const bars = d.hist.map((b, bi) => {
+    const x0 = x(b.from), x1 = x(b.to);
+    const w = Math.max(2, x1 - x0 - 3), h = base - y(b.count);
+    // แท่งกราฟคลิกได้เหมือนการ์ด -> ดูรายชื่อเด็กที่มีค่าอยู่ในช่วงของแท่งนั้น
+    const on = b.count > 0;
+    const last = bi === d.hist.length - 1;
+    return `<g${on ? ` class="clkbar" data-sel="range" data-col="${esc(d.column)}"
+        data-lo="${b.from}" data-hi="${b.to}"${last ? '' : ' data-hix="1"'}` : ''}>
+      <rect x="${x0 + 1.5}" y="${y(b.count)}" width="${w}" height="${Math.max(0, h)}"
+        rx="3" fill="#7cb8ea"><title>${b.from}–${b.to} : ${
+        b.count.toLocaleString('th-TH')} คน${on ? ' (คลิกเพื่อดูรายบุคคล)' : ''}</title></rect>${
+      b.count && h > 16 ? `<text x="${x0 + 1.5 + w / 2}" y="${y(b.count) - 5}"
+        text-anchor="middle" class="vl">${b.count.toLocaleString('th-TH')}</text>` : ''}</g>`;
+  }).join('');
+
+  // แกน X ร่วม 6 ขีด
+  const xticks = Array.from({length: 6}, (_, i) => {
+    const v = lo + span * i / 5, xx = x(v);
+    return `<line x1="${xx}" x2="${xx}" y1="${base}" y2="${base + 5}" stroke="#94a3b8"/>
+      <text x="${xx}" y="${base + 19}" text-anchor="middle" class="ax">${
+        (Math.round(v * 10) / 10).toLocaleString('th-TH')}</text>`;
+  }).join('');
+
+  const cy = BH / 2 - 6;
+  const lab = (v, txt, dy) => `<text x="${x(v)}" y="${cy + dy}" text-anchor="middle"
+      class="bl">${txt} ${(Math.round(v * 100) / 100).toLocaleString('th-TH')}</text>`;
+  const boxSvg = `<svg viewBox="0 0 ${W} ${BH}" class="bigbox">
+    <line x1="${x(d.whisker_lo)}" x2="${x(d.whisker_hi)}" y1="${cy}" y2="${cy}"
+      stroke="#7c8ea0" stroke-width="2"/>
+    ${[d.whisker_lo, d.whisker_hi].map(v =>
+      `<line x1="${x(v)}" x2="${x(v)}" y1="${cy - 16}" y2="${cy + 16}"
+        stroke="#7c8ea0" stroke-width="2"/>`).join('')}
+    <rect x="${x(d.q1)}" y="${cy - 22}" width="${Math.max(2, x(d.q3) - x(d.q1))}" height="44"
+      rx="5" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1.5"/>
+    <line x1="${x(d.median)}" x2="${x(d.median)}" y1="${cy - 22}" y2="${cy + 22}"
+      stroke="#1d4ed8" stroke-width="3"/>
+    ${d.outliers_lo ? `<circle cx="${x(d.min)}" cy="${cy}" r="5" fill="#ef4444"/>` : ''}
+    ${d.outliers_hi ? `<circle cx="${x(d.max)}" cy="${cy}" r="5" fill="#ef4444"/>` : ''}
+    ${lab(d.q1, 'Q1', -30)}${lab(d.median, 'มัธยฐาน', 40)}${lab(d.q3, 'Q3', -30)}
+    ${d.outliers_hi ? `<text x="${x(d.max)}" y="${cy + 40}" text-anchor="middle"
+      class="bl red">outlier ${d.outliers_hi.toLocaleString('th-TH')} ค่า</text>` : ''}
+    ${d.outliers_lo ? `<text x="${x(d.min)}" y="${cy - 30}" text-anchor="middle"
+      class="bl red">outlier ${d.outliers_lo.toLocaleString('th-TH')} ค่า</text>` : ''}
+  </svg>`;
+
+  // การ์ดที่มี sel = คลิกได้ -> เปิดรายชื่อเด็กที่อยู่เบื้องหลังตัวเลขนั้น
+  const stat = (k, v, o) => {
+    o = o || {};
+    const n = o.n;
+    const on = o.sel && n > 0;
+    return `<div class="st ${o.cls || ''} ${on ? 'clk' : ''}"
+      ${on ? `data-sel="${o.sel}" data-col="${esc(d.column)}"
+        title="คลิกเพื่อดูรายชื่อเด็ก ${fmt(n)} ราย"` : ''}>
+      <b>${v}</b><span>${k}</span>${
+      on ? `<em>▸ ดูรายบุคคล ${fmt(n)} ราย</em>` : ''}</div>`;
+  };
+  return `<div class="zstats">
+      ${stat('จำนวนที่มีค่า', fmt(d.n), {sel: 'all', n: d.n})}
+      ${stat('มัธยฐาน', fmt(d.median, 2))}
+      ${stat('เฉลี่ย ± SD', fmt(d.mean, 2) + ' ± ' + fmt(d.sd, 2))}
+      ${stat('Q1 – Q3', fmt(d.q1, 2) + ' – ' + fmt(d.q3, 2), {sel: 'iqr', n: d.iqr_n})}
+      ${stat('ต่ำสุด – สูงสุด', fmt(d.min, 0) + ' – ' + fmt(d.max, 0),
+             {sel: 'extreme', n: d.extreme_n, cls: d.min < 0 ? 'bad' : ''})}
+      ${stat('%outlier', fmt(d.outlier_pct, 1) + '%',
+             {sel: 'outlier', n: d.outlier_n, cls: d.outlier_pct >= 5 ? 'bad' : ''})}
+      ${stat('%เป็นศูนย์', fmt(d.zero_pct, 1) + '%',
+             {sel: 'zero', n: d.zero_n, cls: d.zero_pct >= 50 ? 'bad' : ''})}
+      ${d.neg_n ? stat('ค่าติดลบ', fmt(d.neg_n), {sel: 'neg', n: d.neg_n, cls: 'bad'}) : ''}
+    </div>
+    <div class="ztitle">การกระจายความถี่ (Histogram) — แกนตั้งคือจำนวนคน
+      <span class="zclick">คลิกที่แท่งเพื่อดูรายชื่อเด็กในช่วงนั้น</span></div>
+    <svg viewBox="0 0 ${W} ${HH}" class="bighist">
+      ${yticks}<line x1="${padL}" x2="${W - padR}" y1="${base}" y2="${base}"
+        stroke="#94a3b8"/>${bars}${xticks}</svg>
+    <div class="ztitle">Boxplot — แกนนอนเดียวกับกราฟบน</div>
+    ${boxSvg}
+    <div class="zhelp">กล่องฟ้า = ครึ่งกลางของข้อมูล (Q1–Q3) · เส้นน้ำเงินเข้ม = มัธยฐาน ·
+      ปลายหนวด = ค่าสุดท้ายที่ยังอยู่ในช่วง 1.5 × IQR · จุดแดง = ค่าที่หลุดออกไป (outlier)</div>`;
+}
+
+function openZoom(i) {
+  const d = (EDA_CACHE && EDA_CACHE.numeric || [])[i];
+  if (!d) return;
+  ZOOM = d;
+  $('#zTitle').textContent = d.label;
+  $('#zSub').textContent = `คอลัมน์ ${d.column} · จากข้อมูล ${fmt(d.n)} แถวในขอบเขตที่เลือก`;
+  $('#zBody').innerHTML = bigChart(d);
+  $('#zmodal').hidden = false;
+}
+
+// คลิกการ์ดสถิติ หรือแท่งกราฟ -> เปิดรายชื่อเด็กที่อยู่เบื้องหลังตัวเลขนั้น
+$('#zBody').addEventListener('click', e => {
+  const el = e.target.closest('[data-sel]');
+  if (!el) return;
+  openPending({kind: 'value', col: el.dataset.col, sel: el.dataset.sel,
+               lo: el.dataset.lo, hi: el.dataset.hi, hix: el.dataset.hix},
+              (ZOOM && ZOOM.label) || el.dataset.col);
+});
+
+function edaCategorical(list) {
+  if (!list.length) return '';
+  const cards = list.map(c => `<div class="ccard">
+    <div class="chead"><b>${esc(c.label)}</b> <span>${esc(c.column)}</span>
+      <em>${c.distinct} ค่า · ว่าง ${fmt(c.missing_pct, 1)}%</em></div>
+    <table><tbody>${c.items.map(i => `<tr>
+      <td class="cv">${esc(i.value)}</td>
+      <td class="cl">${esc(i.label)}</td>
+      <td class="cn">${fmt(i.count)}</td>
+      <td class="cp">${fmt(i.pct, 1)}%</td>
+      <td class="barcell">${pctBar(i.pct, 'mid')}</td></tr>`).join('')}</tbody></table>
+  </div>`).join('');
+  return `<section>
+    <h2><span class="no">3</span> ความถี่ของตัวแปรหมวดหมู่</h2>
+    <div class="cond"><div>• คำอธิบายรหัสดึงจาก reference/dentalfile.csv อัตโนมัติ</div></div>
+    <div class="cgrid">${cards}</div>
+  </section>`;
+}
+
+function edaHeatmap(h) {
+  if (!h.metrics || !h.metrics.length) return '';
+  const unitName = h.level === 'unit' ? 'หน่วยบริการ' : 'อำเภอ';
+  const color = s => s === null || s === undefined
+    ? 'background:#f6f8fa;color:var(--muted)'
+    : `background:rgba(${Math.round(239 - 175 * s)},${Math.round(68 + 120 * s)},` +
+      `${Math.round(68 + 70 * s)},${(0.18 + 0.62 * s).toFixed(2)});` +
+      `color:${s > 0.55 ? '#14532d' : '#7f1d1d'}`;
+  const body = h.rows.map(r => `<tr>
+      <td>${r.code ? `<span class="code">${esc(r.code)}</span> ` : ''}${esc(r.name)}</td>
+      ${r.cells.map(c => `<td class="hm" style="${color(c.score)}">${
+        typeof c.value === 'number' ? fmt(c.value, 2) : '–'}</td>`).join('')}
+    </tr>`).join('');
+  return `<section>
+    <h2><span class="no">4</span> Heatmap เปรียบเทียบราย${unitName}</h2>
+    <div class="cond">
+      <div>• เขียว = ดีที่สุดในกลุ่ม · แดง = ด้อยที่สุดในกลุ่ม (เทียบกันเองในหน้านี้ ไม่ใช่เกณฑ์มาตรฐาน)</div>
+      <div>• ช่วงค่า: ${h.metrics.map(m => `${esc(m.label)} ${m.min}–${m.max}`).join(' · ')}</div>
+    </div>
+    <div class="tw"><table><thead><tr><th>${unitName}</th>
+      ${h.metrics.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody></table></div>
+  </section>`;
+}
+
+function renderEda(e) {
+  return `<div class="cond" style="margin:0 0 14px 2px">
+      สำรวจจาก ${fmt(e.n_pop)} แถวในขอบเขตที่เลือก
+      (ตรวจฟันและอยู่ในช่วงอายุ ${fmt(e.n_scoped)} แถว)</div>` +
+    edaAnomalies(e.anomalies) + edaNumeric(e.numeric) +
+    edaCategorical(e.categorical) + edaHeatmap(e.heatmap);
+}
+
+async function loadEda() {
+  const pane = $('#body').querySelector('.pane[data-tab=eda]');
+  if (!pane) return;
+  const q = new URLSearchParams({profile: $('#selProfile').value, pv: $('#selPv').value,
+    amp: $('#selAmp').value, hos: $('#selHos').value});
+  const key = q.toString();
+  if (EDA_KEY === key && EDA_CACHE) { pane.innerHTML = renderEda(EDA_CACHE); return; }
+  pane.innerHTML = '<div class="msg">กำลังสำรวจข้อมูล…</div>';
+  try {
+    const e = await api('/api/eda?' + q);
+    EDA_CACHE = e; EDA_KEY = key;
+    pane.innerHTML = renderEda(e);
+  } catch (err) {
+    pane.innerHTML = `<section><div class="err">${esc(err.message)}</div></section>`;
+  }
+}
+
 // ---------- แท็บรายงาน ----------
 let ACTIVE_TAB = 'overview';
 
@@ -400,6 +768,7 @@ function selectTab(id) {
   $('#body').querySelectorAll('button.tab').forEach(b => {
     b.classList.toggle('on', b.dataset.tab === id);
   });
+  if (id === 'eda') loadEda();      // คำนวณตอนเปิดแท็บครั้งแรกเท่านั้น
 }
 
 // ปุ่มส่งออกของแต่ละตาราง (which = 'overview' | เลขตาราง | 'all')
@@ -663,6 +1032,10 @@ function pendingParams(o) {
     kind: o.kind || 'pending'});
   const hos = o.hos || $('#selHos').value;
   if (hos) q.set('hos', hos);
+  // kind=value ต้องบอกด้วยว่าคอลัมน์ไหนและเลือกช่วงไหน
+  ['col', 'sel', 'lo', 'hi', 'hix'].forEach(k => {
+    if (o[k] !== undefined && o[k] !== null && o[k] !== '') q.set(k, o[k]);
+  });
   return q;
 }
 
@@ -692,6 +1065,8 @@ function renderPendingRows(filter) {
     `${cols.length} คอลัมน์ ` +
     `<span class="lgd"><i class="s-main"></i>สรุป <i class="s-raw"></i>ฟิลด์ต้นฉบับ ` +
     `<i class="s-calc"></i>ค่าที่ระบบคำนวณ</span>` +
+    `<br>หัวตารางและคอลัมน์แรกตรึงไว้แล้ว — เลื่อนแนวนอนที่แถบด้านล่างของตาราง ` +
+    `หรือกด <b>Shift + ล้อเมาส์</b>` +
     (PENDING.total > PENDING.shown
       ? `<br>บนหน้าจอจำกัด ${PENDING.shown.toLocaleString('th-TH')} จากทั้งหมด ` +
         `${PENDING.total.toLocaleString('th-TH')} รายการ — ไฟล์ที่ส่งออกครบทุกรายการ` : '') +
@@ -705,6 +1080,14 @@ function renderPendingRows(filter) {
 
 const KIND_TITLE = {pending: 'เด็กที่ยังไม่ได้ตรวจฟัน',
                     failed: 'เด็กที่ตรวจแล้วไม่ผ่านเกณฑ์คุณภาพ'};
+// คำอธิบายว่าการ์ด/แท่งกราฟที่คลิกมาหมายถึงอะไร
+const VALUE_HINT = {
+  all: 'ทุกรายที่มีค่า', outlier: 'เฉพาะค่าที่หลุดออกนอกหนวด (outlier)',
+  zero: 'เฉพาะค่าที่เป็นศูนย์', neg: 'เฉพาะค่าที่ติดลบ (เป็นไปไม่ได้)',
+  extreme: 'เฉพาะค่าต่ำสุดและสูงสุด', iqr: 'เฉพาะค่าในกล่อง Q1–Q3',
+  range: 'เฉพาะช่วงที่คลิกจากกราฟ',
+};
+
 const KIND_HINT = {
   pending: 'ยังไม่มีวันที่ตรวจในข้อมูล — ควรนัดมาตรวจ',
   failed: 'ตรวจแล้วแต่ข้อมูลตกเกณฑ์คุณภาพ จึงไม่ถูกนับในตารางที่ 2 เป็นต้นไป — ควรตามมาตรวจ/บันทึกใหม่',
@@ -713,7 +1096,8 @@ const KIND_HINT = {
 async function openPending(o, name) {
   const kind = o.kind || 'pending';
   const q = pendingParams({...o, kind});
-  $('#mTitle').textContent = KIND_TITLE[kind] + ' — ' + name;
+  $('#mTitle').textContent = kind === 'value'
+    ? `${name} — ${VALUE_HINT[o.sel] || ''}` : KIND_TITLE[kind] + ' — ' + name;
   $('#mSub').textContent = 'กำลังโหลด…';
   $('#mSearch').value = '';
   $('#mBody').innerHTML = '<div class="msg">กำลังโหลด…</div>';
@@ -723,7 +1107,9 @@ async function openPending(o, name) {
   try {
     const d = await api('/api/people?' + q);
     PENDING = d;
-    $('#mSub').textContent = `ทั้งหมด ${d.total.toLocaleString('th-TH')} คน — ${KIND_HINT[kind]}`;
+    $('#mSub').textContent = `ทั้งหมด ${d.total.toLocaleString('th-TH')} คน — ${
+      kind === 'value' ? (d.meta ? d.meta.what : '') + ' ในขอบเขตที่เลือก'
+                       : KIND_HINT[kind]}`;
     renderPendingRows('');
   } catch (e) {
     $('#mBody').innerHTML = `<div class="err">${esc(e.message)}</div>`;
@@ -732,8 +1118,20 @@ async function openPending(o, name) {
 
 $('#mClose').onclick = () => { $('#modal').hidden = true; };
 $('#modal').onclick = e => { if (e.target.id === 'modal') $('#modal').hidden = true; };
+$('#zClose').onclick = () => { $('#zmodal').hidden = true; };
+$('#zmodal').onclick = e => { if (e.target.id === 'zmodal') $('#zmodal').hidden = true; };
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $('#modal').hidden = true;
+  if (e.key !== 'Escape') return;
+  // ปิดทีละชั้น: รายชื่อเด็กเปิดทับกราฟขยายอยู่ จึงต้องปิดก่อน
+  if (!$('#modal').hidden) $('#modal').hidden = true;
+  else $('#zmodal').hidden = true;
+});
+
+// คลิกแถวใดก็ได้ในตารางการกระจายของค่าตัวเลข -> เปิดกราฟขนาดใหญ่
+// ผูกที่ #body ครั้งเดียว เพราะเนื้อหาแท็บถูกสร้างใหม่ทุกครั้งที่โหลด
+$('#body').addEventListener('click', e => {
+  const row = e.target.closest('tr.zoomrow');
+  if (row) openZoom(Number(row.dataset.zoom));
 });
 $('#mSearch').oninput = e => renderPendingRows(e.target.value);
 $('#mRaw').onchange = $('#mCalc').onchange = () => renderPendingRows($('#mSearch').value);
@@ -763,7 +1161,8 @@ async function loadReport(refresh) {
     const areaRows = r.level === 'unit' ? r.units : r.districts;
     const tabs = [{id: 'overview', label: 'ภาพรวม', sub: 'เปรียบเทียบพื้นที่'}]
       .concat(r.tables.map(t => ({
-        id: 't' + t.no, label: 'ตารางที่ ' + t.no, sub: shortTitle(t.title)})));
+        id: 't' + t.no, label: 'ตารางที่ ' + t.no, sub: shortTitle(t.title)})))
+      .concat([{id: 'eda', label: '🔍 สำรวจข้อมูล', sub: 'คุณภาพ · การกระจาย'}]);
 
     $('#body').innerHTML =
       `<div class="tabbar">${tabs.map(x =>
@@ -772,7 +1171,9 @@ async function loadReport(refresh) {
        <div class="pane" data-tab="overview">
          ${renderOverview(areaRows, r.overview_labels, r.level)}</div>` +
       r.tables.map(t => `<div class="pane" data-tab="t${t.no}" hidden>
-         ${renderTable(t)}</div>`).join('');
+         ${renderTable(t)}</div>`).join('') +
+      '<div class="pane" data-tab="eda" hidden></div>';
+    EDA_CACHE = null;      // ขอบเขตอาจเปลี่ยน ต้องคำนวณใหม่
 
     // เลือกแท็บเดิมไว้ถ้ายังมีอยู่ (เช่นตอนเปลี่ยนพื้นที่)
     if (!tabs.some(x => x.id === ACTIVE_TAB)) ACTIVE_TAB = 'overview';

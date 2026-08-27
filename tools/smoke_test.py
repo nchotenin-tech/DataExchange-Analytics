@@ -101,6 +101,43 @@ def main() -> int:
         for t in rep["tables"]:
             assert t["rows"], f"{pid}: ตารางที่ {t['no']} ว่าง"
             assert "insight" in t, f"{pid}: ตารางที่ {t['no']} ไม่มี insight"
+        # หน้าสำรวจข้อมูล (EDA) ต้องคำนวณได้และเป็น JSON ที่ถูกต้อง
+        e = service.eda(p)
+        assert e["numeric"] and e["categorical"], f"{pid}: EDA ว่าง"
+        import json
+        txt = json.dumps(e, ensure_ascii=False, allow_nan=False)  # NaN -> ValueError
+        assert "NaN" not in txt, f"{pid}: EDA มี NaN ที่เบราว์เซอร์ parse ไม่ได้"
+        # กราฟขยายต้องมีคีย์ครบทุกตัวที่ bigChart() ใช้
+        need = {"n", "mean", "sd", "min", "q1", "median", "q3", "max",
+                "whisker_lo", "whisker_hi", "outliers_lo", "outliers_hi",
+                "outlier_pct", "zero_pct", "hist"}
+        for d in e["numeric"]:
+            miss = need - set(d)
+            assert not miss, f"{pid}/{d['column']}: กราฟขยายขาดคีย์ {miss}"
+            assert d["hist"], f"{pid}/{d['column']}: histogram ว่าง"
+
+        # ตัวเลขบนการ์ดต้องเท่ากับจำนวนรายชื่อที่เปิดดูได้จริง (คลิกการ์ด/แท่งกราฟ)
+        d = max(e["numeric"], key=lambda x: x["outlier_n"])
+        col = d["column"]
+        for sel, want in (("all", d["n"]), ("outlier", d["outlier_n"]),
+                          ("zero", d["zero_n"]), ("neg", d["neg_n"]),
+                          ("extreme", d["extreme_n"]), ("iqr", d["iqr_n"])):
+            got = len(service.value_list(p, col, sel))
+            assert got == want, f"{pid}/{col}/{sel}: การ์ดบอก {want} แต่รายชื่อได้ {got}"
+        # แท่งกราฟแต่ละแท่งต้องตรง และรวมกันได้เท่ากับจำนวนทั้งหมด (ไม่นับซ้ำที่ขอบ)
+        total = 0
+        for i, b in enumerate(d["hist"]):
+            got = len(service.value_list(p, col, "range", b["from"], b["to"],
+                                         hi_exclusive=(i < len(d["hist"]) - 1)))
+            assert got == b["count"], \
+                f"{pid}/{col}: แท่งที่ {i} กราฟบอก {b['count']} แต่รายชื่อได้ {got}"
+            total += got
+        assert total == d["n"], f"{pid}/{col}: ผลรวมแท่งกราฟ {total} ไม่เท่ากับ {d['n']}"
+        print(f"  {pid}: คลิกดูรายบุคคลจาก {col} ตรงทุกการ์ดและทุกแท่งกราฟ ✓")
+        print(f"  {pid}: EDA {len(e['numeric'])} ตัวแปรตัวเลข, "
+              f"{len(e['anomalies']['rules'])} กฎตรวจ, "
+              f"พบปัญหา {e['anomalies']['pct']}% ✓")
+
         # ส่งออกได้จริง
         from core import export
         assert export.xlsx_bytes(export.report_sheets(rep))[:2] == b"PK", "สร้าง xlsx ไม่ได้"

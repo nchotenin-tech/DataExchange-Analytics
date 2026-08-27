@@ -6,7 +6,7 @@ import threading
 
 import pandas as pd
 
-from . import derive, insight, loader, profiles as prof_mod
+from . import derive, eda as eda_mod, insight, loader, profiles as prof_mod
 from .engine import Profile, apply_scope, build_report, quality_mask
 
 _cache: dict[str, pd.DataFrame] = {}
@@ -311,6 +311,7 @@ FAILED_COLS = [
 PERSON_KINDS = {
     "pending": "เด็กที่ยังไม่ได้ตรวจฟัน",
     "failed": "เด็กที่ตรวจแล้วไม่ผ่านเกณฑ์คุณภาพ",
+    "value": "ข้อมูลรายบุคคลจากหน้าสำรวจข้อมูล",
 }
 
 
@@ -437,6 +438,86 @@ def person_list(profile: Profile, kind: str = "pending",
     return _select(out, PENDING_COLS, {"hoscode", "age_today", "birth_str"}, raw)
 
 
+VALUE_COLS = [
+    ("_value", "ค่าที่เลือก"),
+    ("hoscode", "รหัสหน่วยบริการ"),
+    ("hosname", "หน่วยบริการ"),
+    ("ampname", "อำเภอ"),
+    ("pid", "PID"),
+    ("cid", "เลขบัตรประชาชน"),
+    ("name", "ชื่อ"),
+    ("lname", "นามสกุล"),
+    ("sex_label", "เพศ"),
+    ("birth_str", "วันเกิด"),
+    ("age", "อายุขณะตรวจ (ปี)"),
+    ("date_str", "วันที่ตรวจ"),
+    ("provider_label", "ผู้ตรวจ"),
+    ("pteeth", "ฟันแท้ที่มี (ซี่)"),
+    ("dteeth", "ฟันน้ำนมที่มี (ซี่)"),
+    ("addr", "บ้านเลขที่"),
+    ("tumbonname", "ตำบล"),
+]
+
+# ตัวเลือกที่หน้าสำรวจข้อมูลส่งมา -> คำอธิบายที่แสดงบนหัวตาราง
+VALUE_SELECTIONS = {
+    "all": "ทุกแถวที่มีค่า",
+    "outlier": "ค่าที่หลุดออกนอกหนวด (outlier)",
+    "zero": "ค่าที่เป็นศูนย์",
+    "neg": "ค่าที่ติดลบ (เป็นไปไม่ได้)",
+    "extreme": "ค่าต่ำสุดและสูงสุด",
+    "iqr": "ค่าที่อยู่ในกล่อง Q1–Q3",
+    "range": "ค่าที่อยู่ในช่วงที่เลือกจากกราฟ",
+}
+
+
+def value_list(profile: Profile, col: str, sel: str = "outlier",
+               lo=None, hi=None, pv=None, amp=None, hos=None,
+               raw: bool = False, hi_exclusive: bool = False) -> pd.DataFrame:
+    """รายบุคคลที่อยู่เบื้องหลังตัวเลขในหน้าสำรวจข้อมูล (คลิกจากการ์ดหรือแท่งกราฟ)
+
+    ใช้ข้อมูลชุดเดียวกับที่ eda() ใช้ (scoped) และคำนวณ IQR ซ้ำด้วยวิธีเดียวกัน
+    ตัวเลขบนการ์ดกับจำนวนรายชื่อที่เปิดได้จึงตรงกันเสมอ
+    """
+    scoped = apply_scope(filter_area(get_dataset(profile), pv, amp, hos), profile)
+    if col not in scoped.columns:
+        return pd.DataFrame()
+
+    v = pd.to_numeric(scoped[col], errors="coerce")
+    have = v.notna()
+
+    if sel == "zero":
+        m = have & (v == 0)
+    elif sel == "neg":
+        m = have & (v < 0)
+    elif sel == "extreme":
+        m = have & ((v == v.min()) | (v == v.max()))
+    elif sel in ("outlier", "iqr"):
+        q1, q3 = float(v.quantile(0.25)), float(v.quantile(0.75))
+        iqr = q3 - q1
+        inside = have & (v >= q1 - 1.5 * iqr) & (v <= q3 + 1.5 * iqr)
+        m = (~inside & have) if sel == "outlier" else (have & (v >= q1) & (v <= q3))
+    elif sel == "range":
+        # แท่งกราฟใช้ขอบบนแบบไม่รวม (ยกเว้นแท่งสุดท้าย) ไม่งั้นค่าที่ตรงขอบ
+        # จะถูกนับซ้ำในสองแท่ง แล้วยอดรวมจะเกินจำนวนจริง
+        m = have
+        if lo is not None:
+            m &= v >= float(lo)
+        if hi is not None:
+            m &= (v < float(hi)) if hi_exclusive else (v <= float(hi))
+    else:
+        m = have
+
+    out = scoped[m.fillna(False)].copy()
+    out["_value"] = v[m.fillna(False)]
+    out = _add_person_fields(out)
+    res = _select(out, VALUE_COLS, set(), raw)
+    # เรียงจากค่ามาก -> น้อย เพื่อให้ค่าที่ผิดปกติที่สุดอยู่บนสุด (ค่าติดลบเรียงกลับด้าน)
+    label = VALUE_COLS[0][1]
+    if label in res.columns:
+        res = res.sort_values(label, ascending=(sel == "neg")).reset_index(drop=True)
+    return res
+
+
 def person_column_groups(profile: Profile, result: pd.DataFrame) -> dict:
     """แบ่งคอลัมน์ของผลลัพธ์เป็น 3 กลุ่ม ให้หน้าเว็บสลับซ่อน/แสดงได้"""
     rawset = set(raw_columns(get_dataset(profile)))
@@ -451,6 +532,17 @@ def person_column_groups(profile: Profile, result: pd.DataFrame) -> dict:
 
 def pending(profile: Profile, pv=None, amp=None, hos=None) -> pd.DataFrame:
     return person_list(profile, "pending", pv, amp, hos)
+
+
+def eda(profile: Profile, pv=None, amp=None, hos=None) -> dict:
+    """สำรวจข้อมูลเบื้องต้นในขอบเขตที่เลือก"""
+    df = get_dataset(profile)
+    pop = filter_area(df, pv, amp, hos)
+    scoped = apply_scope(pop, profile)
+    level = "unit" if (amp or hos) else "district"
+    rows = by_unit(pop, profile) if (amp and not hos) else by_district(pop, profile)
+    return eda_mod.build(pop, scoped, profile, rows, level,
+                         dictionary(), overview_spec(profile))
 
 
 def report(profile: Profile, pv=None, amp=None, hos=None, refresh=False) -> dict:

@@ -104,6 +104,7 @@ class Profile:
     quality_extra: dict[str, str] = field(default_factory=dict)
     overview: dict = field(default_factory=dict)
     filename_columns: list[dict] = field(default_factory=list)
+    data_help: list[dict] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Profile":
@@ -121,6 +122,7 @@ class Profile:
             quality_extra=d.get("quality_extra", {}) or {},
             overview=d.get("overview", {}) or {},
             filename_columns=d.get("filename_columns", []) or [],
+            data_help=d.get("data_help", []) or [],
             tables=[TableSpec.from_dict(t) for t in d.get("tables", [])],
         )
 

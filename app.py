@@ -13,9 +13,13 @@ import time
 import traceback
 import webbrowser
 
+import math
+
 import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
+from flask.json.provider import DefaultJSONProvider
 
+from core import eda as eda_mod
 from core import export
 from core import profiles as prof_mod
 from core import service
@@ -23,11 +27,29 @@ from core import service
 # PyInstaller: templates/static ถูก bundle ไว้ใน sys._MEIPASS
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "2.5.0"
+VERSION = "2.7.0"
+
+def _json_safe(o):
+    """NaN / Infinity ไม่ใช่ JSON ที่ถูกต้อง — เบราว์เซอร์จะ parse ไม่ผ่าน
+    (Python ยอมรับได้ จึงมองไม่เห็นถ้าทดสอบด้วย Python อย่างเดียว)"""
+    if isinstance(o, float):
+        return None if (math.isnan(o) or math.isinf(o)) else o
+    if isinstance(o, dict):
+        return {k: _json_safe(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_json_safe(v) for v in o]
+    return o
+
+
+class NanSafeJSON(DefaultJSONProvider):
+    def dumps(self, obj, **kwargs):
+        return super().dumps(_json_safe(obj), **kwargs)
+
 
 app = Flask(__name__,
             template_folder=os.path.join(BASE, "templates"),
             static_folder=os.path.join(BASE, "static"))
+app.json = NanSafeJSON(app)
 
 # อ่าน template ใหม่ทุกครั้งที่ไฟล์เปลี่ยน (ไม่งั้นต้องปิด-เปิดโปรแกรมใหม่ถึงจะเห็นการแก้ไข)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -118,6 +140,27 @@ def api_report():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
+@app.route("/api/eda")
+def api_eda():
+    """สำรวจข้อมูลเบื้องต้น (EDA)"""
+    pid = request.args.get("profile")
+    p = PROFILES.get(pid) or load_profiles().get(pid)
+    if not p:
+        return jsonify({"error": f"ไม่พบ profile: {pid}"}), 404
+    try:
+        return jsonify(service.eda(
+            p,
+            pv=request.args.get("pv") or None,
+            amp=request.args.get("amp") or None,
+            hos=request.args.get("hos") or None,
+        ))
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
 # --------------------------------------------------------------------------- #
 # ส่งออกตารางรายงาน
 # --------------------------------------------------------------------------- #
@@ -190,16 +233,27 @@ def _people_df():
     kind = request.args.get("kind", "pending")
     if kind not in service.PERSON_KINDS:
         kind = "pending"
-    df = service.person_list(
-        p, kind,
-        pv=request.args.get("pv") or None,
-        amp=request.args.get("amp") or None,
-        hos=request.args.get("hos") or None,
-        raw=request.args.get("raw", "1") != "0",   # ค่าเริ่มต้น = แสดงฟิลด์ต้นฉบับด้วย
-    )
-    scope = (request.args.get("hos") or request.args.get("amp")
-             or request.args.get("pv") or "ทั้งหมด")
-    return p, (df, kind, f"{service.PERSON_KINDS[kind]}_{pid}_{scope}")
+    area = dict(pv=request.args.get("pv") or None,
+                amp=request.args.get("amp") or None,
+                hos=request.args.get("hos") or None)
+    raw = request.args.get("raw", "1") != "0"      # ค่าเริ่มต้น = แสดงฟิลด์ต้นฉบับด้วย
+    scope = area["hos"] or area["amp"] or area["pv"] or "ทั้งหมด"
+
+    # kind=value -> รายบุคคลเบื้องหลังตัวเลขในหน้าสำรวจข้อมูล (คลิกการ์ด/แท่งกราฟ)
+    if kind == "value":
+        col = request.args.get("col", "")
+        sel = request.args.get("sel", "outlier")
+        num = lambda k: (float(request.args[k]) if request.args.get(k) not in (None, "")
+                         else None)
+        df = service.value_list(p, col, sel, num("lo"), num("hi"), raw=raw,
+                                hi_exclusive=request.args.get("hix") == "1", **area)
+        label = dict(eda_mod.NUMERIC_CANDIDATES).get(col, col)
+        what = service.VALUE_SELECTIONS.get(sel, sel)
+        return p, (df, kind, f"{label}_{what}_{pid}_{scope}",
+                   {"label": label, "column": col, "sel": sel, "what": what})
+
+    df = service.person_list(p, kind, raw=raw, **area)
+    return p, (df, kind, f"{service.PERSON_KINDS[kind]}_{pid}_{scope}", None)
 
 
 @app.route("/api/people")
@@ -208,16 +262,21 @@ def api_people():
     p, res = _people_df()
     if not p:
         return jsonify({"error": "ไม่พบ profile"}), 404
-    df, kind, _ = res
+    df, kind, _, meta = res
     limit = int(request.args.get("limit", "500"))
+    title = (f"{meta['label']} — {meta['what']}" if meta
+             else service.PERSON_KINDS[kind])
     return jsonify({
         "kind": kind,
-        "title": service.PERSON_KINDS[kind],
+        "title": title,
+        "meta": meta,
         "total": len(df),
         "shown": min(len(df), limit),
         "columns": list(df.columns),
         "groups": service.person_column_groups(p, df),
-        "rows": df.head(limit).where(df.notna(), None).to_dict("records"),
+        # astype(object) ก่อน ไม่งั้นคอลัมน์ float จะเปลี่ยน None กลับเป็น NaN
+        "rows": df.head(limit).astype(object).where(pd.notna(df.head(limit)), None)
+                  .to_dict("records"),
     })
 
 
@@ -227,7 +286,7 @@ def api_people_csv():
     p, res = _people_df()
     if not p:
         return jsonify({"error": "ไม่พบ profile"}), 404
-    df, _, name = res
+    df, _, name, _meta = res
     return _send(export.csv_bytes(df), name, "csv")
 
 
@@ -237,8 +296,8 @@ def api_people_xlsx():
     p, res = _people_df()
     if not p:
         return jsonify({"error": "ไม่พบ profile"}), 404
-    df, kind, name = res
-    sheet = "ยังไม่ได้ตรวจ" if kind == "pending" else "ไม่ผ่านเกณฑ์"
+    df, kind, name, _meta = res
+    sheet = {"pending": "ยังไม่ได้ตรวจ", "failed": "ไม่ผ่านเกณฑ์"}.get(kind, "สำรวจข้อมูล")
     return _send(export.xlsx_bytes([(sheet, df, [])], text_cols=export.CODE_COLS),
                  name, "xlsx")
 
