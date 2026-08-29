@@ -45,6 +45,8 @@ class Metric:
     kind: str = "count"          # count | mean | sum
     denominator: str | None = None
     note: str = ""
+    # followup=true -> เป็น "ปัญหา" ที่ต้องตามต่อ หน้าเว็บจะให้คลิกดูรายบุคคลได้
+    followup: bool = False
 
 
 @dataclass
@@ -75,6 +77,7 @@ class TableSpec:
                     kind=m.get("kind", "count"),
                     denominator=m.get("denominator"),
                     note=m.get("note", ""),
+                    followup=bool(m.get("followup", False)),
                 )
                 for m in d.get("metrics", [])
             ],
@@ -219,7 +222,9 @@ def build_quality_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> 
     cols = list(rows[0].keys()) if rows else ["row"]
     return {"no": spec.no, "title": spec.title, "kind": spec.kind,
             "row_label": _row_label(spec),
-            "columns": cols, "rows": rows, "conditions": spec.conditions}
+            "columns": cols, "rows": rows, "conditions": spec.conditions,
+            # ช่อง "ไม่ผ่าน: ..." คลิกดูรายชื่อเด็กที่ตกเกณฑ์ข้อนั้นได้
+            "followup": [f'ไม่ผ่าน: {c["name"]}' for c in profile.quality_checks]}
 
 
 def build_count_pct_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> dict:
@@ -239,7 +244,8 @@ def build_count_pct_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -
     return {"no": spec.no, "title": spec.title, "kind": spec.kind,
             "row_label": _row_label(spec),
             "columns": cols, "rows": rows, "conditions": spec.conditions,
-            "metric_names": [m.name for m in spec.metrics]}
+            "metric_names": [m.name for m in spec.metrics],
+            "followup": [m.name for m in spec.metrics if m.followup]}
 
 
 def build_mean_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> dict:
@@ -260,7 +266,8 @@ def build_mean_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> dic
     return {"no": spec.no, "title": spec.title, "kind": spec.kind,
             "row_label": _row_label(spec),
             "columns": cols, "rows": rows, "conditions": spec.conditions,
-            "metric_names": [m.name for m in spec.metrics]}
+            "metric_names": [m.name for m in spec.metrics],
+            "followup": [m.name for m in spec.metrics if m.followup]}
 
 
 def _denominator_mask(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> pd.Series:

@@ -27,7 +27,7 @@ from core import service
 # PyInstaller: templates/static ถูก bundle ไว้ใน sys._MEIPASS
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 
 def _json_safe(o):
     """NaN / Infinity ไม่ใช่ JSON ที่ถูกต้อง — เบราว์เซอร์จะ parse ไม่ผ่าน
@@ -252,6 +252,17 @@ def _people_df():
         return p, (df, kind, f"{label}_{what}_{pid}_{scope}",
                    {"label": label, "column": col, "sel": sel, "what": what})
 
+    # kind=metric -> รายบุคคลเบื้องหลังตัวเลขในตารางรายงาน (คลิกช่องในตาราง)
+    if kind == "metric":
+        no = request.args.get("table", "")
+        met = request.args.get("metric", "")
+        row = request.args.get("row") or None
+        df = service.metric_list(p, no, met, row, raw=raw, **area)
+        rowtxt = f"อายุ {row}" if row and row != "รวม" else "ทุกอายุ"
+        return p, (df, kind, f"ตารางที่ {no}_{met}_{rowtxt}_{pid}_{scope}",
+                   {"label": met, "what": f"ตารางที่ {no} · {rowtxt}",
+                    "table": no, "row": row})
+
     df = service.person_list(p, kind, raw=raw, **area)
     return p, (df, kind, f"{service.PERSON_KINDS[kind]}_{pid}_{scope}", None)
 
@@ -266,17 +277,24 @@ def api_people():
     limit = int(request.args.get("limit", "500"))
     title = (f"{meta['label']} — {meta['what']}" if meta
              else service.PERSON_KINDS[kind])
+    head = df.head(limit)
+    # _bad = รายชื่อคอลัมน์ที่ทำให้แถวนี้ตกเกณฑ์ (หน้าเว็บเอาไประบายสีแดง)
+    # ไม่ใช่คอลัมน์ที่ต้องแสดง จึงตัดออกจาก columns แต่ยังส่งไปกับ rows
+    cols = [c for c in df.columns if c != "_bad"]
+    vis = head[cols]
+    recs = vis.astype(object).where(pd.notna(vis), None).to_dict("records")
+    if "_bad" in head.columns:
+        for rec, bad in zip(recs, head["_bad"]):
+            rec["_bad"] = list(bad) if isinstance(bad, (list, tuple)) else []
     return jsonify({
         "kind": kind,
         "title": title,
         "meta": meta,
         "total": len(df),
         "shown": min(len(df), limit),
-        "columns": list(df.columns),
-        "groups": service.person_column_groups(p, df),
-        # astype(object) ก่อน ไม่งั้นคอลัมน์ float จะเปลี่ยน None กลับเป็น NaN
-        "rows": df.head(limit).astype(object).where(pd.notna(df.head(limit)), None)
-                  .to_dict("records"),
+        "columns": cols,
+        "groups": service.person_column_groups(p, df[cols]),
+        "rows": recs,
     })
 
 
@@ -287,7 +305,8 @@ def api_people_csv():
     if not p:
         return jsonify({"error": "ไม่พบ profile"}), 404
     df, _, name, _meta = res
-    return _send(export.csv_bytes(df), name, "csv")
+    return _send(export.csv_bytes(df.drop(columns=["_bad"], errors="ignore")),
+                 name, "csv")
 
 
 @app.route("/api/people.xlsx")
@@ -297,8 +316,10 @@ def api_people_xlsx():
     if not p:
         return jsonify({"error": "ไม่พบ profile"}), 404
     df, kind, name, _meta = res
-    sheet = {"pending": "ยังไม่ได้ตรวจ", "failed": "ไม่ผ่านเกณฑ์"}.get(kind, "สำรวจข้อมูล")
-    return _send(export.xlsx_bytes([(sheet, df, [])], text_cols=export.CODE_COLS),
+    sheet = {"pending": "ยังไม่ได้ตรวจ", "failed": "ไม่ผ่านเกณฑ์",
+             "metric": "รายชื่อติดตาม"}.get(kind, "สำรวจข้อมูล")
+    return _send(export.xlsx_bytes([(sheet, df.drop(columns=["_bad"], errors="ignore"),
+                                     [])], text_cols=export.CODE_COLS),
                  name, "xlsx")
 
 

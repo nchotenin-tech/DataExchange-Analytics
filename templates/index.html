@@ -202,6 +202,10 @@ th.act{background:#f5fafe;z-index:3}
 tbody tr:hover td.act{background:#f8fcff}
 tr.clickable:hover td.act{background:#eaf5ff}
 span.ok{font-size:11.5px;color:var(--mint)}
+/* ช่องตัวเลขที่คลิกดูรายชื่อเด็กได้ */
+td.drill{cursor:pointer;color:#1f6fb2;font-weight:600;
+  text-decoration:underline dotted #9ec9e8 2px;text-underline-offset:3px}
+td.drill:hover{background:#e8f4ff;text-decoration-color:#1f6fb2}
 
 .modal{position:fixed;inset:0;z-index:200;background:rgba(23,54,79,.45);
   display:flex;align-items:center;justify-content:center;padding:24px}
@@ -282,6 +286,11 @@ tr.zoomrow:hover .zbtn{background:#2f6fa8;border-color:#2f6fa8;color:#fff}
 /* คอลัมน์กลุ่มต่าง ๆ ใช้สีพื้นแยกให้ดูออกว่าเป็นค่าดิบหรือค่าที่คำนวณ */
 .mbody th.c-raw{background:#fdf6ec}  .mbody td.c-raw{background:#fffcf6}
 .mbody th.c-calc{background:#eef7f4} .mbody td.c-calc{background:#f7fdfb}
+/* ช่องที่ทำให้แถวนี้ตกเกณฑ์คุณภาพ — ต้องเด่นกว่าสีกลุ่มคอลัมน์ */
+.mbody td.badcell{background:#ffe3de !important;color:#b3261e;font-weight:700;
+  box-shadow:inset 0 0 0 1px #f0a89d}
+.mbody tbody tr:hover td.badcell{background:#ffd5cd !important}
+.lgd i.s-bad{background:#ffe3de;border-color:#f0a89d}
 .mbody tbody tr:hover td{background:#eaf5ff}
 .note{font-size:11.5px;color:var(--muted);padding:10px 0 6px;line-height:1.7}
 .lgd{margin-left:8px}
@@ -805,12 +814,22 @@ function renderTable(t) {
       `<th>${c === 'row' ? rowLabel : c}</th>`).join('') + '</tr>';
   }
 
+  // ช่องที่เป็น "ปัญหา" (followup ใน profile) คลิกดูรายชื่อเด็กที่ต้องตามต่อได้
+  const followup = new Set(t.followup || []);
+  const metricOf = c => c.includes('|') ? c.split('|')[0] : c;
+
   const tbody = t.rows.map(r => {
     const tot = r.row === 'รวม';
     return `<tr class="${tot ? 'total' : ''}">` + cols.map(c => {
       const v = r[c];
       const d = isPct(c) || (t.kind === 'mean' && c !== 'row' && c !== 'ฐาน') ? 2 : 0;
-      return `<td class="${isPct(c) ? 'pct' : ''}">${fmt(v, c === 'row' ? 0 : d)}</td>`;
+      const met = metricOf(c);
+      const on = followup.has(met) && v !== null && v !== undefined && v !== 0
+                 && c !== 'row' && c !== 'ฐาน';
+      const cls = (isPct(c) ? 'pct ' : '') + (on ? 'drill' : '');
+      const attr = on ? ` data-tno="${esc(t.no)}" data-met="${esc(met)}"` +
+                        ` data-row="${esc(r.row)}" title="คลิกดูรายชื่อเด็ก"` : '';
+      return `<td class="${cls.trim()}"${attr}>${fmt(v, c === 'row' ? 0 : d)}</td>`;
     }).join('') + '</tr>';
   }).join('');
 
@@ -821,7 +840,9 @@ function renderTable(t) {
       ${ins ? `<button class="mini insbtn on" data-toggle="ins">✕ ซ่อนสรุป</button>` : ''}
       ${chart ? `<button class="mini chartbtn on" data-toggle="chart">✕ ซ่อนกราฟ</button>` : ''}
       ${exportBtns(t.no)}</h2>
-    <div class="cond">${(t.conditions || []).map(c => `<div>• ${c}</div>`).join('')}</div>
+    <div class="cond">${(t.conditions || []).map(c => `<div>• ${c}</div>`).join('')}
+      ${(t.followup || []).length ? '<div>• <b>ตัวเลขที่ขีดเส้นใต้คลิกได้</b> — ' +
+        'เปิดรายชื่อเด็กที่ต้องตามต่อ พร้อมสรุปสิ่งที่ต้องทำ และส่งออก Excel ได้</div>' : ''}</div>
     ${ins}${chart}
     <div class="tw"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>
   </section>`;
@@ -1033,7 +1054,7 @@ function pendingParams(o) {
   const hos = o.hos || $('#selHos').value;
   if (hos) q.set('hos', hos);
   // kind=value ต้องบอกด้วยว่าคอลัมน์ไหนและเลือกช่วงไหน
-  ['col', 'sel', 'lo', 'hi', 'hix'].forEach(k => {
+  ['col', 'sel', 'lo', 'hi', 'hix', 'table', 'metric', 'row'].forEach(k => {
     if (o[k] !== undefined && o[k] !== null && o[k] !== '') q.set(k, o[k]);
   });
   return q;
@@ -1059,22 +1080,32 @@ function renderPendingRows(filter) {
     $('#mBody').innerHTML = '<div class="msg">ไม่พบรายการ</div>';
     return;
   }
-  const cls = c => rawSet.has(c) ? ' class="c-raw"' : calcSet.has(c) ? ' class="c-calc"' : '';
+  const cls = c => rawSet.has(c) ? 'c-raw' : calcSet.has(c) ? 'c-calc' : '';
+  const th = c => { const k = cls(c); return k ? ` class="${k}"` : ''; };
+  // _bad = คอลัมน์ที่ทำให้แถวนี้ตกเกณฑ์ (ส่งมาจากเซิร์ฟเวอร์) -> ระบายแดง
+  const anyBad = rows.some(r => (r._bad || []).length);
   $('#mBody').innerHTML =
     `<div class="note">แสดง ${rows.length.toLocaleString('th-TH')} รายการ · ` +
     `${cols.length} คอลัมน์ ` +
     `<span class="lgd"><i class="s-main"></i>สรุป <i class="s-raw"></i>ฟิลด์ต้นฉบับ ` +
-    `<i class="s-calc"></i>ค่าที่ระบบคำนวณ</span>` +
+    `<i class="s-calc"></i>ค่าที่ระบบคำนวณ${
+      anyBad ? '<i class="s-bad"></i>ช่องสีแดง = ค่าที่ทำให้ไม่ผ่านเกณฑ์' : ''}</span>` +
     `<br>หัวตารางและคอลัมน์แรกตรึงไว้แล้ว — เลื่อนแนวนอนที่แถบด้านล่างของตาราง ` +
     `หรือกด <b>Shift + ล้อเมาส์</b>` +
     (PENDING.total > PENDING.shown
       ? `<br>บนหน้าจอจำกัด ${PENDING.shown.toLocaleString('th-TH')} จากทั้งหมด ` +
         `${PENDING.total.toLocaleString('th-TH')} รายการ — ไฟล์ที่ส่งออกครบทุกรายการ` : '') +
     '</div><div class="tw"><table><thead><tr>' +
-    cols.map(c => `<th${cls(c)}>${esc(c)}</th>`).join('') + '</tr></thead><tbody>' +
-    rows.map(r => '<tr>' + cols.map(c =>
-      `<td${cls(c)}>${r[c] === null || r[c] === undefined ? '–' : esc(r[c])}</td>`
-    ).join('') + '</tr>').join('') +
+    cols.map(c => `<th${th(c)}>${esc(c)}</th>`).join('') + '</tr></thead><tbody>' +
+    rows.map(r => {
+      const bad = new Set(r._bad || []);
+      return '<tr>' + cols.map(c => {
+        const k = [cls(c), bad.has(c) ? 'badcell' : ''].filter(Boolean).join(' ');
+        const v = r[c] === null || r[c] === undefined ? '–' : esc(r[c]);
+        return `<td${k ? ` class="${k}"` : ''}${
+          bad.has(c) ? ' title="ค่านี้ทำให้ไม่ผ่านเกณฑ์"' : ''}>${v}</td>`;
+      }).join('') + '</tr>';
+    }).join('') +
     '</tbody></table></div>';
 }
 
@@ -1096,8 +1127,10 @@ const KIND_HINT = {
 async function openPending(o, name) {
   const kind = o.kind || 'pending';
   const q = pendingParams({...o, kind});
-  $('#mTitle').textContent = kind === 'value'
-    ? `${name} — ${VALUE_HINT[o.sel] || ''}` : KIND_TITLE[kind] + ' — ' + name;
+  $('#mTitle').textContent =
+    kind === 'value' ? `${name} — ${VALUE_HINT[o.sel] || ''}` :
+    kind === 'metric' ? `เด็กที่ต้องตามต่อ — ${name}` :
+    KIND_TITLE[kind] + ' — ' + name;
   $('#mSub').textContent = 'กำลังโหลด…';
   $('#mSearch').value = '';
   $('#mBody').innerHTML = '<div class="msg">กำลังโหลด…</div>';
@@ -1108,8 +1141,10 @@ async function openPending(o, name) {
     const d = await api('/api/people?' + q);
     PENDING = d;
     $('#mSub').textContent = `ทั้งหมด ${d.total.toLocaleString('th-TH')} คน — ${
-      kind === 'value' ? (d.meta ? d.meta.what : '') + ' ในขอบเขตที่เลือก'
-                       : KIND_HINT[kind]}`;
+      kind === 'value' ? (d.meta ? d.meta.what : '') + ' ในขอบเขตที่เลือก' :
+      kind === 'metric' ? (d.meta ? d.meta.what : '') +
+        ' — คอลัมน์แรกสรุปว่าต้องทำอะไรบ้าง ส่งออก Excel เพื่อใช้ติดตามงานได้' :
+      KIND_HINT[kind]}`;
     renderPendingRows('');
   } catch (e) {
     $('#mBody').innerHTML = `<div class="err">${esc(e.message)}</div>`;
@@ -1125,6 +1160,17 @@ document.addEventListener('keydown', e => {
   // ปิดทีละชั้น: รายชื่อเด็กเปิดทับกราฟขยายอยู่ จึงต้องปิดก่อน
   if (!$('#modal').hidden) $('#modal').hidden = true;
   else $('#zmodal').hidden = true;
+});
+
+// คลิกช่องตัวเลขที่เป็นปัญหาในตารางรายงาน -> รายชื่อเด็กที่ต้องตามต่อ
+$('#body').addEventListener('click', e => {
+  const td = e.target.closest('td.drill');
+  if (!td) return;
+  e.stopPropagation();          // กันไม่ให้ไป drill-down อำเภอพร้อมกัน
+  openPending({kind: 'metric', table: td.dataset.tno, metric: td.dataset.met,
+               row: td.dataset.row},
+              `${td.dataset.met} · ${td.dataset.row === 'รวม' ? 'ทุกอายุ'
+                : 'อายุ ' + td.dataset.row}`);
 });
 
 // คลิกแถวใดก็ได้ในตารางการกระจายของค่าตัวเลข -> เปิดกราฟขนาดใหญ่

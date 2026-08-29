@@ -312,6 +312,7 @@ PERSON_KINDS = {
     "pending": "เด็กที่ยังไม่ได้ตรวจฟัน",
     "failed": "เด็กที่ตรวจแล้วไม่ผ่านเกณฑ์คุณภาพ",
     "value": "ข้อมูลรายบุคคลจากหน้าสำรวจข้อมูล",
+    "metric": "รายชื่อเด็กที่ต้องติดตามจากตารางรายงาน",
 }
 
 
@@ -414,6 +415,90 @@ def fail_reasons(df: pd.DataFrame, profile: Profile) -> pd.Series:
     return pd.Series(texts, index=df.index, dtype="string")
 
 
+_IDENT_RE = None
+
+
+def _expr_columns(expr: str, df: pd.DataFrame) -> list[str]:
+    """ดึงชื่อคอลัมน์ที่ expression อ้างถึง เช่น "dteeth + dextract == 20"
+    -> ["dteeth", "dextract"] (กรองด้วยคอลัมน์จริงในข้อมูล คำอย่าง and/in จึงหลุดไป)
+    """
+    global _IDENT_RE
+    if _IDENT_RE is None:
+        import re
+        _IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
+    return [w for w in dict.fromkeys(_IDENT_RE.findall(str(expr or "")))
+            if w in df.columns]
+
+
+# ฟิลด์ดิบบางตัวถูกแปลงเป็นคอลัมน์อ่านง่ายก่อนแสดง ต้องระบายสีคู่กัน
+_DISPLAY_ALIAS = {
+    "providertype": ["provider_label"],
+    "gum_status": ["gum_label"],
+    "sex": ["sex_label"],
+    "birth": ["birth_str"],
+    "date_serv": ["date_str"],
+    "need_fluoride": ["need_fluoride_label"],
+    "need_scaling": ["need_scaling_label"],
+}
+
+
+def _headers_for(cols: list[str], spec) -> list[str]:
+    """แปลงชื่อคอลัมน์ดิบ -> ชื่อหัวตารางที่หน้าเว็บใช้จริง (ทั้งชื่อดิบและชื่อสรุป)"""
+    out = []
+    for c in cols:
+        out.append(c)                                   # คอลัมน์ฟิลด์ต้นฉบับ
+        for src in [c] + _DISPLAY_ALIAS.get(c, []):
+            out += [t for col, t in spec if col == src]  # คอลัมน์สรุปของฟิลด์เดียวกัน
+    return list(dict.fromkeys(out))
+
+
+def fail_fields(df: pd.DataFrame, profile: Profile, spec,
+                checks=None) -> pd.Series:
+    """คืน "ชื่อคอลัมน์ที่ทำให้ตกเกณฑ์" ของแต่ละแถว เพื่อให้หน้าเว็บระบายสีแดงได้
+
+    ทำงานบน numpy array เหมือน fail_reasons — ถ้าเกณฑ์ข้อไหนไม่มีใครตก
+    pandas จะเปลี่ยน dtype เป็น float แล้ว None กลายเป็น NaN ซึ่ง truthy
+    """
+    import numpy as np
+
+    from .engine import bool_mask
+
+    n = len(df)
+    if n == 0:
+        return pd.Series([[]] * 0, index=df.index, dtype=object)
+
+    marks: list[tuple[np.ndarray, list[str]]] = []
+    for chk in (checks if checks is not None else profile.quality_checks):
+        only = chk.get("bands")
+        applies = (df["band"].isin(only).to_numpy(dtype=bool)
+                   if only and "band" in df.columns else np.ones(n, dtype=bool))
+        fail = (~bool_mask(df, chk["expr"]).to_numpy(dtype=bool)) & applies
+        marks.append((fail, _headers_for(_expr_columns(chk["expr"], df), spec)))
+
+    out = [sorted({h for fail, hs in marks if fail[i] for h in hs}) for i in range(n)]
+    return pd.Series(out, index=df.index, dtype=object)
+
+
+def _bad_first(res: pd.DataFrame, after: int = 1) -> pd.DataFrame:
+    """ย้ายคอลัมน์ที่ทำให้ตกเกณฑ์ขึ้นมาไว้ต้นตาราง
+
+    ตารางกว้าง 80+ คอลัมน์ ถ้าไม่ย้ายขึ้นมา ผู้ใช้ต้องเลื่อนหาช่องสีแดงเอง
+    """
+    if "_bad" not in res.columns or res.empty:
+        return res
+    # ตัดชื่อคอลัมน์ที่ไม่ได้แสดงทิ้ง (เช่น ปิดฟิลด์ต้นฉบับ) ไม่งั้นหน้าเว็บหาไม่เจอ
+    have = set(res.columns)
+    res = res.copy()
+    res["_bad"] = [[h for h in (lst or []) if h in have] for lst in res["_bad"]]
+    bad = {h for lst in res["_bad"] for h in lst}
+    if not bad:
+        return res
+    cols = list(res.columns)
+    front = cols[:after] + [c for c in cols if c in bad]
+    rest = [c for c in cols if c not in front]
+    return res[front + rest]
+
+
 def person_list(profile: Profile, kind: str = "pending",
                 pv=None, amp=None, hos=None, raw: bool = False) -> pd.DataFrame:
     """รายชื่อเด็กสำหรับติดตาม
@@ -429,10 +514,15 @@ def person_list(profile: Profile, kind: str = "pending",
         out = scoped[~quality_mask(scoped, profile)].copy()
         if len(out):
             out["fail_reason"] = fail_reasons(out, profile)
+            out["_bad"] = fail_fields(out, profile, FAILED_COLS)
         else:
             out["fail_reason"] = pd.Series(dtype="object")
+            out["_bad"] = pd.Series(dtype="object")
         out = _add_person_fields(out)
-        return _select(out, FAILED_COLS, {"hoscode", "date_serv", "age"}, raw)
+        # คอลัมน์แรกคือ "สาเหตุที่ไม่ผ่านเกณฑ์" ... จึงย้ายช่องที่ผิดมาต่อจากนั้น
+        res = _select(out, FAILED_COLS + [("_bad", "_bad")],
+                      {"hoscode", "date_serv", "age"}, raw)
+        return _bad_first(res, after=4)
 
     out = _add_person_fields(df[~df["examined"].fillna(False)].copy())
     return _select(out, PENDING_COLS, {"hoscode", "age_today", "birth_str"}, raw)
@@ -516,6 +606,175 @@ def value_list(profile: Profile, col: str, sel: str = "outlier",
     if label in res.columns:
         res = res.sort_values(label, ascending=(sel == "neg")).reset_index(drop=True)
     return res
+
+
+TREATMENT_COLS = [
+    ("_problem", "ปัญหาที่พบ / สิ่งที่ต้องทำ"),
+    ("hoscode", "รหัสหน่วยบริการ"),
+    ("hosname", "หน่วยบริการ"),
+    ("ampname", "อำเภอ"),
+    ("pid", "PID"),
+    ("cid", "เลขบัตรประชาชน"),
+    ("name", "ชื่อ"),
+    ("lname", "นามสกุล"),
+    ("sex_label", "เพศ"),
+    ("birth_str", "วันเกิด"),
+    ("age", "อายุขณะตรวจ (ปี)"),
+    ("age_today", "อายุปัจจุบัน (ปี)"),
+    ("date_str", "วันที่ตรวจ"),
+    ("provider_label", "ผู้ตรวจ"),
+    ("gum_label", "สภาวะปริทันต์"),
+    ("pcaries", "ฟันแท้ผุ (ซี่)"),
+    ("pextract", "ฟันแท้ถอน (ซี่)"),
+    ("pfilling", "ฟันแท้อุด (ซี่)"),
+    ("dcaries", "ฟันน้ำนมผุ (ซี่)"),
+    ("dextract", "ฟันน้ำนมถอน (ซี่)"),
+    ("dfilling", "ฟันน้ำนมอุด (ซี่)"),
+    ("need_sealant", "ต้องเคลือบหลุมร่องฟัน (ซี่)"),
+    ("need_pfilling", "ต้องอุดฟันแท้ (ซี่)"),
+    ("need_dfilling", "ต้องอุดฟันน้ำนม (ซี่)"),
+    ("need_pextract", "ต้องถอน/รักษารากฟันแท้ (ซี่)"),
+    ("need_dextract", "ต้องถอนฟันน้ำนม (ซี่)"),
+    ("need_fluoride_label", "ต้องทาฟลูออไรด์"),
+    ("need_scaling_label", "ต้องขูดหินน้ำลาย"),
+    ("addr", "บ้านเลขที่"),
+    ("check_typearea", "typearea"),
+    ("tumbonname", "ตำบล"),
+]
+
+# (คอลัมน์, ข้อความ) — ใส่จำนวนซี่ต่อท้ายให้อัตโนมัติ
+_PROBLEM_RULES = [
+    ("pcaries", "ฟันแท้ผุ"), ("dcaries", "ฟันน้ำนมผุ"),
+    ("pextract", "ฟันแท้ถอน/หลุด"), ("dextract", "ฟันน้ำนมถอน"),
+    ("need_sealant", "ต้องเคลือบหลุมร่องฟัน"),
+    ("need_pfilling", "ต้องอุดฟันแท้"), ("need_dfilling", "ต้องอุดฟันน้ำนม"),
+    ("need_pextract", "ต้องถอน/รักษารากฟันแท้"), ("need_dextract", "ต้องถอนฟันน้ำนม"),
+]
+
+
+def problem_summary(df: pd.DataFrame) -> pd.Series:
+    """สรุปเป็นข้อความว่าเด็กคนนี้มีปัญหาอะไรและต้องทำอะไรบ้าง
+
+    ทำงานบน numpy array เหมือน fail_reasons เพื่อเลี่ยงปัญหา NaN เป็น truthy
+    """
+    import numpy as np
+
+    n = len(df)
+    if n == 0:
+        return pd.Series([], index=df.index, dtype="string")
+
+    parts: list[tuple[np.ndarray, list[str]]] = []
+    for col, text in _PROBLEM_RULES:
+        if col not in df.columns:
+            continue
+        v = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        hit = (v > 0).fillna(False).to_numpy(dtype=bool)
+        if hit.any():
+            labels = [f"{text} {int(x)} ซี่" for x in v.to_numpy()]
+            parts.append((hit, labels))
+
+    for col, text, yes in (("need_fluoride", "ต้องทาฟลูออไรด์", 1),
+                           ("need_scaling", "ต้องขูดหินน้ำลาย", 1)):
+        if col not in df.columns:
+            continue
+        # ต้อง fillna ก่อน to_numpy(bool) — คอลัมน์ Int64 ที่มีค่าว่างจะ raise
+        hit = ((pd.to_numeric(df[col], errors="coerce") == yes)
+               .fillna(False).to_numpy(dtype=bool))
+        if hit.any():
+            parts.append((hit, [text] * n))
+
+    if "gum_status" in df.columns:
+        g = df["gum_status"].astype("string")
+        for code, text in (("1", "เหงือกมีเลือดออก"), ("2", "เหงือกอักเสบ/มีหินน้ำลาย"),
+                           ("3", "ปริทันต์อักเสบ"), ("9", "ตรวจสภาวะปริทันต์ไม่ได้")):
+            hit = (g == code).fillna(False).to_numpy(dtype=bool)
+            if hit.any():
+                parts.append((hit, [text] * n))
+
+    texts = [" + ".join(lbl[i] for hit, lbl in parts if hit[i]) or "ไม่พบปัญหาที่ต้องตามต่อ"
+             for i in range(n)]
+    return pd.Series(texts, index=df.index, dtype="string")
+
+
+def _label_cols(out: pd.DataFrame) -> pd.DataFrame:
+    """คอลัมน์ที่ต้องแปลรหัสเป็นคำอ่านก่อนแสดง"""
+    yn = {1: "ต้องทำ", 2: "ไม่ต้อง", 0: "ไม่ต้อง"}
+    for col, new in (("need_fluoride", "need_fluoride_label"),
+                     ("need_scaling", "need_scaling_label")):
+        if col in out.columns:
+            out[new] = pd.to_numeric(out[col], errors="coerce").map(yn).fillna("ไม่ระบุ")
+    return out
+
+
+def metric_list(profile: Profile, table_no: str, metric: str, row=None,
+                pv=None, amp=None, hos=None, raw: bool = False) -> pd.DataFrame:
+    """รายชื่อเด็กที่อยู่เบื้องหลังตัวเลขในตารางรายงาน (คลิกจากช่องในตาราง)
+
+    ใช้ spec เดียวกับตอนสร้างตาราง (ตัวหาร + expr ของตัวชี้วัด)
+    ตัวเลขในตารางกับจำนวนรายชื่อจึงตรงกันเสมอ
+    """
+    from .engine import TOTAL_LABEL, _denominator_mask, bool_mask, evaluate
+
+    spec = next((t for t in profile.tables if str(t.no) == str(table_no)), None)
+    if spec is None:
+        return pd.DataFrame()
+
+    scoped = apply_scope(filter_area(get_dataset(profile), pv, amp, hos), profile)
+    sub = scoped
+
+    # กรองตามแถวของตาราง (อายุ หรือ กลุ่มอายุ) — "รวม" = ทุกแถว
+    if row not in (None, "", TOTAL_LABEL):
+        if spec.rows == "age":
+            try:
+                sub = sub[sub["age"] == int(float(row))]
+            except (TypeError, ValueError):
+                pass
+        elif spec.rows in ("bands", "band"):
+            sub = sub[sub["band"] == str(row)]
+
+    value_col = None
+    bad_check = None
+    if spec.kind == "quality":
+        # metric = "ไม่ผ่าน: <ชื่อเกณฑ์>"
+        name = str(metric).split(":", 1)[-1].strip()
+        chk = next((c for c in profile.quality_checks if c["name"] == name), None)
+        if chk is None:
+            return pd.DataFrame()
+        only = chk.get("bands")
+        applies = (sub["band"].isin(only) if only and "band" in sub.columns
+                   else pd.Series(True, index=sub.index))
+        sub = sub[~bool_mask(sub, chk["expr"]) & applies]
+        bad_check = chk
+    else:
+        m = next((x for x in spec.metrics if x.name == metric), None)
+        if m is None:
+            return pd.DataFrame()
+        sub = sub[_denominator_mask(sub, spec, profile)]
+        if spec.kind == "mean":
+            # ตารางค่าเฉลี่ย: คนที่ "มี" ค่ามากกว่า 0 คือคนที่ต้องตามต่อ
+            v = pd.to_numeric(evaluate(sub, m.expr), errors="coerce")
+            sub = sub[(v > 0).fillna(False)]
+            value_col = v.loc[sub.index]
+        else:
+            sub = sub[bool_mask(sub, m.expr)]
+
+    out = _label_cols(_add_person_fields(sub.copy()))
+    out["_problem"] = problem_summary(out)
+    cols = list(TREATMENT_COLS)
+    if bad_check is not None:
+        out["_bad"] = fail_fields(out, profile, TREATMENT_COLS, checks=[bad_check])
+        cols = cols + [("_bad", "_bad")]
+    if value_col is not None:
+        out["_value"] = value_col
+        cols = [("_value", f"{metric} (ซี่)")] + cols
+    if value_col is not None:
+        # ตารางค่าเฉลี่ย: เรียงจากรุนแรงมากไปน้อย ให้ตามเคสหนักก่อน
+        res = _select(out, cols, set(), raw)
+        res = res.sort_values(res.columns[0], ascending=False).reset_index(drop=True)
+    else:
+        # ตารางนับจำนวน: เรียงตามหน่วยบริการ เพื่อส่งรายชื่อให้แต่ละ รพ.สต. ตามต่อ
+        res = _select(out, cols, {"hoscode", "pid"}, raw)
+    return _bad_first(res, after=4)
 
 
 def person_column_groups(profile: Profile, result: pd.DataFrame) -> dict:

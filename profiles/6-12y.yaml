@@ -53,12 +53,15 @@ tables:
       - name: "ฟันดีไม่มีผุ"
         expr: "pcaries + pextract == 0"
       - name: "ฟันผุไม่ได้รักษา"
+        followup: true
         expr: "pcaries > 0"
       - name: "ฟันถอน"
+        followup: true
         expr: "pextract > 0"
       - name: "ฟันอุด"
         expr: "pfilling > 0"
       - name: "ฟันผุถอนอุด"
+        followup: true
         expr: "pcaries + pfilling + pextract > 0"
 
   # ---------------------------------------------------------------------------
@@ -73,12 +76,15 @@ tables:
       - name: "ฟันที่มีในปาก"
         expr: "pteeth"
       - name: "ฟันผุ"
+        followup: true
         expr: "pcaries"
       - name: "ฟันถอน"
+        followup: true
         expr: "pextract"
       - name: "ฟันอุด"
         expr: "pfilling"
       - name: "ฟันผุถอนอุด"
+        followup: true
         expr: "pcaries + pfilling + pextract"
 
   # ---------------------------------------------------------------------------
@@ -94,12 +100,16 @@ tables:
       - name: "ปกติ"
         expr: "gum_status == '0'"
       - name: "เลือดออก"
+        followup: true
         expr: "gum_status == '1'"
       - name: "เหงือกอักเสบ"
+        followup: true
         expr: "gum_status == '2'"
       - name: "ปริทันต์"
+        followup: true
         expr: "gum_status == '3'"
       - name: "ตรวจไม่ได้"
+        followup: true
         expr: "gum_status == '9'"
 
   # ---------------------------------------------------------------------------
@@ -114,12 +124,16 @@ tables:
       - name: "ปกติ"
         expr: "gum_sx_0"
       - name: "เลือดออก"
+        followup: true
         expr: "gum_sx_1"
       - name: "เหงือกอักเสบ"
+        followup: true
         expr: "gum_sx_2"
       - name: "ปริทันต์"
+        followup: true
         expr: "gum_sx_3"
       - name: "ตรวจไม่ได้"
+        followup: true
         expr: "gum_sx_9"
 
   # ---------------------------------------------------------------------------
@@ -135,12 +149,17 @@ tables:
       - "ถอนฟัน/รักษารากฟัน = need_pextract > 0 หรือ need_dextract > 0"
     metrics:
       - name: "ทาฟลูออไรด์"
+        followup: true
         expr: "need_fluoride == 1"
       - name: "เคลือบหลุมร่องฟัน"
+        followup: true
         expr: "need_sealant > 0"
       - name: "อุดฟัน"
+        followup: true
         expr: "need_pfilling > 0 or need_dfilling > 0"
       - name: "ถอนฟัน/รักษารากฟัน"
+        followup: true
         expr: "need_pextract > 0 or need_dextract > 0"
       - name: "ขูดหินปูน"
+        followup: true
         expr: "need_scaling == 1"

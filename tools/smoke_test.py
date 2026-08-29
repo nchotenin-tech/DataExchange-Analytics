@@ -138,6 +138,29 @@ def main() -> int:
               f"{len(e['anomalies']['rules'])} กฎตรวจ, "
               f"พบปัญหา {e['anomalies']['pct']}% ✓")
 
+        # ช่องที่คลิกได้ในตาราง -> จำนวนรายชื่อต้องตรงกับตัวเลขในตารางเป๊ะ
+        n_cells = 0
+        for t in rep["tables"]:
+            assert "followup" in t, f"{pid}: ตารางที่ {t['no']} ไม่มีรายการช่องที่คลิกได้"
+            if t["kind"] == "mean":
+                continue          # ค่าเฉลี่ยเทียบกับจำนวนคนตรง ๆ ไม่ได้
+            for met in t["followup"]:
+                for r in t["rows"]:
+                    key = f"{met}|จำนวน" if f"{met}|จำนวน" in r else met
+                    want = r.get(key)
+                    if not want:
+                        continue
+                    lst = service.metric_list(p, t["no"], met, r["row"])
+                    assert len(lst) == want, (
+                        f"{pid}: ตารางที่ {t['no']} '{met}' แถว {r['row']} "
+                        f"ตารางบอก {want} แต่รายชื่อได้ {len(lst)}")
+                    col = lst["ปัญหาที่พบ / สิ่งที่ต้องทำ"]
+                    assert col.notna().all() and col.map(lambda v: isinstance(v, str)).all(), \
+                        f"{pid}: คอลัมน์สรุปสิ่งที่ต้องทำมีค่าว่างหรือไม่ใช่ข้อความ"
+                    n_cells += 1
+        assert n_cells, f"{pid}: ไม่มีช่องไหนคลิกดูรายบุคคลได้เลย"
+        print(f"  {pid}: ช่องที่คลิกดูรายชื่อได้ {n_cells} ช่อง ตรงกับตารางทุกช่อง ✓")
+
         # ส่งออกได้จริง
         from core import export
         assert export.xlsx_bytes(export.report_sheets(rep))[:2] == b"PK", "สร้าง xlsx ไม่ได้"
@@ -148,6 +171,17 @@ def main() -> int:
         assert len(fail) == s["examined"] - s["qualified"], f"{pid}: ยอดตกเกณฑ์ไม่ตรง"
         assert s["target"] == s["examined"] + s["pending"] + s["out_of_range"], \
             f"{pid}: ยอดรวมไม่ลงตัว"
+
+        # ทุกแถวที่ตกเกณฑ์ต้องบอกได้ว่า "ฟิลด์ไหน" ผิด (หน้าเว็บเอาไประบายสีแดง)
+        if len(fail):
+            assert "_bad" in fail.columns, f"{pid}: รายชื่อตกเกณฑ์ไม่มีคอลัมน์ _bad"
+            for i, cells in enumerate(fail["_bad"]):
+                assert isinstance(cells, list) and cells, \
+                    f"{pid}: แถวที่ {i} ตกเกณฑ์แต่ไม่ได้ระบุฟิลด์ที่ผิด"
+                miss = [c for c in cells if c not in fail.columns]
+                assert not miss, f"{pid}: ระบุฟิลด์ที่ไม่มีในตาราง {miss}"
+            print(f"  {pid}: ระบุฟิลด์ที่ทำให้ตกเกณฑ์ครบทุกแถว "
+                  f"({sorted({c for cs in fail['_bad'] for c in cs})}) ✓")
 
         # ตัวเลขบนปุ่มต้องเท่ากับจำนวนรายชื่อที่เปิดดูได้จริง
         rows = rep["units"] if rep.get("level") == "unit" else rep["districts"]

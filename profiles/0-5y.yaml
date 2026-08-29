@@ -93,12 +93,15 @@ tables:
       - name: "ฟันดีไม่มีผุ"
         expr: "dcaries + dextract == 0"
       - name: "ฟันผุไม่ได้รักษา"
+        followup: true
         expr: "dcaries > 0"
       - name: "ฟันถอน"
+        followup: true
         expr: "dextract > 0"
       - name: "ฟันอุด"
         expr: "dfilling > 0"
       - name: "ฟันผุถอนอุด"
+        followup: true
         expr: "dcaries + dfilling + dextract > 0"
 
   # ---------------------------------------------------------------------------
@@ -114,12 +117,15 @@ tables:
       - name: "ฟันที่มีในปาก"
         expr: "dteeth"
       - name: "ฟันผุ"
+        followup: true
         expr: "dcaries"
       - name: "ฟันถอน"
+        followup: true
         expr: "dextract"
       - name: "ฟันอุด"
         expr: "dfilling"
       - name: "ฟันผุถอนอุด"
+        followup: true
         expr: "dcaries + dfilling + dextract"
 
   # ---------------------------------------------------------------------------
@@ -134,12 +140,17 @@ tables:
       - "อุดฟัน = need_dfilling > 0 | ถอนฟัน/รักษารากฟัน = need_dextract > 0"
     metrics:
       - name: "ทาฟลูออไรด์"
+        followup: true
         expr: "need_fluoride == 1"
       - name: "เคลือบหลุมร่องฟัน"
+        followup: true
         expr: "need_sealant > 0"
       - name: "อุดฟัน"
+        followup: true
         expr: "need_dfilling > 0"
       - name: "ถอนฟัน/รักษารากฟัน"
+        followup: true
         expr: "need_dextract > 0"
       - name: "ขูดหินปูน"
+        followup: true
         expr: "need_scaling == 1"
