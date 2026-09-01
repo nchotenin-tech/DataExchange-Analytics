@@ -201,6 +201,9 @@ td.act,th.act{text-align:left;position:sticky;right:0;background:#fff;z-index:2;
 th.act{background:#f5fafe;z-index:3}
 tbody tr:hover td.act{background:#f8fcff}
 tr.clickable:hover td.act{background:#eaf5ff}
+/* แถวย่อยรายอายุที่แตกจากช่วงอายุ — ข้อมูลเสริม ไม่ใช่แถวของแบบรายงาน */
+tr.subrow td{background:#fbfdff;color:var(--ink2);font-size:12.5px}
+tr.subrow td:first-child{padding-left:26px;color:var(--muted)}
 span.ok{font-size:11.5px;color:var(--mint)}
 /* ช่องตัวเลขที่คลิกดูรายชื่อเด็กได้ */
 td.drill{cursor:pointer;color:#1f6fb2;font-weight:600;
@@ -820,7 +823,7 @@ function renderTable(t) {
 
   const tbody = t.rows.map(r => {
     const tot = r.row === 'รวม';
-    return `<tr class="${tot ? 'total' : ''}">` + cols.map(c => {
+    return `<tr class="${tot ? 'total' : ''}${r._sub ? ' subrow' : ''}">` + cols.map(c => {
       const v = r[c];
       const d = isPct(c) || (t.kind === 'mean' && c !== 'row' && c !== 'ฐาน') ? 2 : 0;
       const met = metricOf(c);
@@ -829,7 +832,8 @@ function renderTable(t) {
       const cls = (isPct(c) ? 'pct ' : '') + (on ? 'drill' : '');
       const attr = on ? ` data-tno="${esc(t.no)}" data-met="${esc(met)}"` +
                         ` data-row="${esc(r.row)}" title="คลิกดูรายชื่อเด็ก"` : '';
-      return `<td class="${cls.trim()}"${attr}>${fmt(v, c === 'row' ? 0 : d)}</td>`;
+      const txt = (c === 'row' && r._sub) ? `↳ ${fmt(v, 0)} ปี` : fmt(v, c === 'row' ? 0 : d);
+      return `<td class="${cls.trim()}"${attr}>${txt}</td>`;
     }).join('') + '</tr>';
   }).join('');
 
@@ -965,8 +969,12 @@ function tableChart(t) {
   const names = t.metric_names || [];
   if (!names.length || t.kind === 'quality') return '';
   const uid = 'c' + (++CHART_SEQ) + '_';
-  const rows = t.rows.filter(r => String(r.row) !== 'รวม')
-    .map(r => ({...r, key: String(r.row), name: String(r.row)}));
+  // ช่วงอายุที่ถูกแตกเป็นรายอายุ ให้กราฟแสดงแถวย่อยแทนแถวหลัก (ไม่งั้นนับซ้ำ)
+  const split = new Set(t.rows.map(r => r._parent).filter(Boolean));
+  const rows = t.rows
+    .filter(r => String(r.row) !== 'รวม' && !split.has(String(r.row)))
+    .map(r => ({...r, key: String(r.row),
+                name: r._sub ? `${r.row} ปี` : String(r.row)}));
   if (!rows.length) return '';
 
   const pct = t.kind === 'count_pct';

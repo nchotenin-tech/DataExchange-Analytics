@@ -730,7 +730,11 @@ def metric_list(profile: Profile, table_no: str, metric: str, row=None,
             except (TypeError, ValueError):
                 pass
         elif spec.rows in ("bands", "band"):
-            sub = sub[sub["band"] == str(row)]
+            # แถวย่อยรายอายุ (split: true ใน profile) ส่งมาเป็นตัวเลข เช่น "4"
+            if str(row).strip().isdigit():
+                sub = sub[sub["age"] == int(row)]
+            else:
+                sub = sub[sub["band"] == str(row)]
 
     value_col = None
     bad_check = None

@@ -27,7 +27,7 @@ from core import service
 # PyInstaller: templates/static ถูก bundle ไว้ใน sys._MEIPASS
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "2.8.0"
+VERSION = "2.9.0"
 
 def _json_safe(o):
     """NaN / Infinity ไม่ใช่ JSON ที่ถูกต้อง — เบราว์เซอร์จะ parse ไม่ผ่าน

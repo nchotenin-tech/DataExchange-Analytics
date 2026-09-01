@@ -129,8 +129,10 @@ def _rule_masks(df: pd.DataFrame, profile) -> list[tuple[str, str, pd.Series]]:
             df["date_serv"].notna() & (df["date_serv"] > pd.Timestamp.today()))
     if "age" in have and profile is not None:
         a = num("age")
-        add(f"อายุขณะตรวจนอกช่วง {profile.age_min}-{profile.age_max} ปี",
-            "คำนวณจาก date_serv - birth",
+        clamp = getattr(profile, "age_clamp", None)
+        note = ("คำนวณจาก date_serv - birth (ปรับเข้าช่วงให้แล้ว ยังนับในรายงาน)"
+                if clamp else "คำนวณจาก date_serv - birth")
+        add(f"อายุขณะตรวจนอกช่วง {profile.age_min}-{profile.age_max} ปี", note,
             df["examined"].fillna(False) & a.notna()
             & ((a < profile.age_min) | (a > profile.age_max)))
     if "providertype" in have:

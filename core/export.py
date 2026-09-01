@@ -23,6 +23,9 @@ def table_to_frame(t: dict, multi_header: bool = False) -> pd.DataFrame:
     for c in cols:
         vals = [r.get(c) for r in t["rows"]]
         if c == "row":
+            # แถวย่อยรายอายุ ให้ติดป้ายให้ชัดในไฟล์ที่ส่งออก ไม่งั้นจะดูเหมือนแถวปกติ
+            vals = [f"  {v} ปี (ย่อย)" if r.get("_sub") else v
+                    for v, r in zip(vals, t["rows"])]
             top, sub = row_label, ""
         elif "|" in c:
             top, sub = c.split("|", 1)

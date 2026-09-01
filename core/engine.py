@@ -86,10 +86,15 @@ class TableSpec:
 
 @dataclass
 class Band:
-    """ช่วงอายุย่อยที่ใช้เป็นแถวของตาราง เช่น 0-2 ปี, 3-5 ปี"""
+    """ช่วงอายุย่อยที่ใช้เป็นแถวของตาราง เช่น 0-2 ปี, 3-5 ปี
+
+    split=true -> แตกเป็นแถวย่อยรายอายุใต้ช่วงนั้นด้วย (เช่น 3-5 -> 3, 4, 5)
+    แถวหลักยังอยู่ครบตามแบบรายงานราชการ แถวย่อยเป็นข้อมูลเสริม
+    """
     label: str
     min: int
     max: int
+    split: bool = False
 
 
 @dataclass
@@ -108,6 +113,9 @@ class Profile:
     overview: dict = field(default_factory=dict)
     filename_columns: list[dict] = field(default_factory=list)
     data_help: list[dict] = field(default_factory=list)
+    # "max" = อายุที่คำนวณได้เกินช่วง ให้ปรับลงมาเท่าขอบบน (ไม่ตัดเด็กออกจากรายงาน)
+    # "min" = ต่ำกว่าขอบล่างให้ปรับขึ้น | "both" = ทั้งสองด้าน | None = ไม่ปรับ
+    age_clamp: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Profile":
@@ -120,12 +128,15 @@ class Profile:
             row_filter=d.get("row_filter"),
             quality_filter=d["quality_filter"],
             quality_checks=d.get("quality_checks", []),
-            bands=[Band(label=str(b["label"]), min=int(b["min"]), max=int(b["max"]))
+            bands=[Band(label=str(b["label"]), min=int(b["min"]), max=int(b["max"]),
+                        split=bool(b.get("split", False)))
                    for b in d.get("bands", []) or []],
             quality_extra=d.get("quality_extra", {}) or {},
             overview=d.get("overview", {}) or {},
             filename_columns=d.get("filename_columns", []) or [],
             data_help=d.get("data_help", []) or [],
+            age_clamp=(str(d["age_clamp"]).lower()
+                       if d.get("age_clamp") not in (None, "", False) else None),
             tables=[TableSpec.from_dict(t) for t in d.get("tables", [])],
         )
 
@@ -150,6 +161,20 @@ def quality_mask(df: pd.DataFrame, profile: Profile) -> pd.Series:
 # การคำนวณ
 # --------------------------------------------------------------------------- #
 
+def clamped_age(df: pd.DataFrame, profile: Profile) -> pd.Series:
+    """อายุที่ใช้จริงในรายงาน — ปรับเข้าช่วงตาม age_clamp ของ profile
+
+    ใช้กับกลุ่มที่รายชื่อจาก HDC คือกลุ่มเป้าหมายอยู่แล้ว เช่น เด็กที่เพิ่งครบ 6 ปี
+    ก่อนวันตรวจ ยังต้องนับเป็นเด็ก 5 ปี ไม่ใช่ตัดออกจากรายงาน
+    """
+    age = pd.to_numeric(df["age"], errors="coerce")
+    if profile.age_clamp in ("max", "both"):
+        age = age.clip(upper=profile.age_max)
+    if profile.age_clamp in ("min", "both"):
+        age = age.clip(lower=profile.age_min)
+    return age
+
+
 def apply_scope(df: pd.DataFrame, profile: Profile) -> pd.DataFrame:
     """กรองให้เหลือเฉพาะแถวที่ตรวจฟันและอยู่ในช่วงอายุของ profile
 
@@ -159,10 +184,10 @@ def apply_scope(df: pd.DataFrame, profile: Profile) -> pd.DataFrame:
     m = df["examined"].fillna(False).astype(bool).copy()
     if profile.row_filter:
         m &= bool_mask(df, profile.row_filter)
-    age = df["age"]
+    age = clamped_age(df, profile)
     m &= (age.notna() & (age >= profile.age_min) & (age <= profile.age_max)).to_numpy()
     out = df[m].copy()
-    out["age"] = out["age"].astype("Int64")
+    out["age"] = age[m].round().astype("Int64")
     if profile.bands:
         out["band"] = out["age"].map(profile.band_of).astype("string")
     return out
@@ -173,14 +198,20 @@ def _age_index(profile: Profile) -> list:
 
 
 def _groups(df: pd.DataFrame, spec: TableSpec, profile: Profile):
-    """คืน [(label, sub_df), ...] โดยมีแถว 'รวม' ต่อท้ายเสมอ"""
+    """คืน [(label, sub_df, is_sub), ...] โดยมีแถว 'รวม' ต่อท้ายเสมอ
+
+    is_sub=True คือแถวย่อยรายอายุที่แตกจากช่วงอายุ (ไม่ใช่แถวของแบบรายงาน)
+    """
     if spec.rows == "age":
         for a in _age_index(profile):
-            yield a, df[df["age"] == a]
+            yield a, df[df["age"] == a], None
     elif spec.rows in ("bands", "band"):
         for b in profile.bands:
-            yield b.label, df[df["band"] == b.label]
-    yield TOTAL_LABEL, df
+            yield b.label, df[df["band"] == b.label], None
+            if b.split:
+                for a in range(b.min, b.max + 1):
+                    yield a, df[df["age"] == a], b.label
+    yield TOTAL_LABEL, df, None
 
 
 def _row_label(spec: TableSpec) -> str:
@@ -198,12 +229,12 @@ def build_quality_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> 
     """ตารางคุณภาพข้อมูล: จำนวนที่ตรวจ / ผ่านเกณฑ์ / ร้อยละ + สาเหตุที่ไม่ผ่าน"""
     qual = quality_mask(df, profile)
     rows = []
-    for label, sub in _groups(df, spec, profile):
+    for label, sub, parent in _groups(df, spec, profile):
         sub_q = qual.loc[sub.index]
         n = len(sub)
         n_pass = int(sub_q.sum())
         row = {
-            "row": label,
+            "row": label, "_sub": bool(parent), "_parent": parent,
             "จำนวนที่ตรวจ": n,
             "จำนวนที่ผ่านเกณฑ์คุณภาพ": n_pass,
             "ร้อยละ": _pct(n_pass, n, spec.decimals),
@@ -219,7 +250,8 @@ def build_quality_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> 
             row[f'ร้อยละไม่ผ่าน: {chk["name"]}'] = _pct(fail, base, spec.decimals)
         rows.append(row)
 
-    cols = list(rows[0].keys()) if rows else ["row"]
+    cols = [c for c in (rows[0].keys() if rows else ["row"])
+            if c not in ("_sub", "_parent")]
     return {"no": spec.no, "title": spec.title, "kind": spec.kind,
             "row_label": _row_label(spec),
             "columns": cols, "rows": rows, "conditions": spec.conditions,
@@ -230,9 +262,9 @@ def build_quality_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> 
 def build_count_pct_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> dict:
     denom_mask = _denominator_mask(df, spec, profile)
     rows = []
-    for label, sub in _groups(df, spec, profile):
+    for label, sub, parent in _groups(df, spec, profile):
         base = int(denom_mask.loc[sub.index].sum())
-        row = {"row": label, "ฐาน": base}
+        row = {"row": label, "_sub": bool(parent), "_parent": parent, "ฐาน": base}
         for m in spec.metrics:
             hit = int((bool_mask(sub, m.expr) & denom_mask.loc[sub.index]).sum())
             row[f"{m.name}|จำนวน"] = hit
@@ -251,10 +283,10 @@ def build_count_pct_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -
 def build_mean_table(df: pd.DataFrame, spec: TableSpec, profile: Profile) -> dict:
     denom_mask = _denominator_mask(df, spec, profile)
     rows = []
-    for label, sub in _groups(df, spec, profile):
+    for label, sub, parent in _groups(df, spec, profile):
         dm = denom_mask.loc[sub.index]
         base = int(dm.sum())
-        row = {"row": label, "ฐาน": base}
+        row = {"row": label, "_sub": bool(parent), "_parent": parent, "ฐาน": base}
         for m in spec.metrics:
             vals = pd.to_numeric(evaluate(sub, m.expr), errors="coerce")[dm]
             total = float(vals.sum())

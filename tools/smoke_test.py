@@ -138,6 +138,37 @@ def main() -> int:
               f"{len(e['anomalies']['rules'])} กฎตรวจ, "
               f"พบปัญหา {e['anomalies']['pct']}% ✓")
 
+        # age_clamp: max -> อายุที่เกินช่วงต้องถูกดึงกลับมา ไม่ใช่ตัดทิ้ง
+        scoped = apply_scope(service.get_dataset(p), p)
+        ages = scoped["age"].dropna()
+        assert ages.max() <= p.age_max and ages.min() >= p.age_min, \
+            f"{pid}: อายุในรายงานหลุดช่วง {p.age_min}-{p.age_max}"
+        if p.age_clamp:
+            raw = pd.to_numeric(service.get_dataset(p)["age"], errors="coerce")
+            over = int((raw > p.age_max).sum()) if p.age_clamp in ("max", "both") else 0
+            under = int((raw < p.age_min).sum()) if p.age_clamp in ("min", "both") else 0
+            # ปรับครบทั้งสองด้านเท่านั้นจึงจะไม่เหลือใครถูกตัดออก
+            if p.age_clamp == "both":
+                assert s["out_of_range"] == 0, \
+                    f"{pid}: ตั้ง age_clamp: both แล้วแต่ยังมีเด็กถูกตัดออก {s['out_of_range']} คน"
+            print(f"  {pid}: age_clamp={p.age_clamp} -> ปรับขึ้น {under} คน / "
+                  f"ปรับลง {over} คน | เหลือถูกตัดออก {s['out_of_range']} คน ✓")
+
+        # ช่วงอายุที่ตั้ง split: true ต้องมีแถวย่อยรายอายุครบ และผลรวมต้องเท่าแถวหลัก
+        for b in [x for x in p.bands if x.split]:
+            for t in rep["tables"]:
+                rows = {str(r["row"]): r for r in t["rows"]}
+                subs = [r for r in t["rows"] if r.get("_parent") == b.label]
+                want = list(range(b.min, b.max + 1))
+                assert [r["row"] for r in subs] == want, \
+                    f"{pid}: ช่วง {b.label} ควรมีแถวย่อย {want} แต่ได้ {[r['row'] for r in subs]}"
+                base_key = "ฐาน" if "ฐาน" in rows[b.label] else "จำนวนที่ตรวจ"
+                got = sum(r[base_key] for r in subs)
+                assert got == rows[b.label][base_key], (
+                    f"{pid}: ตารางที่ {t['no']} ผลรวมแถวย่อย {got} "
+                    f"ไม่เท่าแถว {b.label} ({rows[b.label][base_key]})")
+            print(f"  {pid}: ช่วง {b.label} แตกเป็นรายอายุ {want} ครบและยอดตรง ✓")
+
         # ช่องที่คลิกได้ในตาราง -> จำนวนรายชื่อต้องตรงกับตัวเลขในตารางเป๊ะ
         n_cells = 0
         for t in rep["tables"]:

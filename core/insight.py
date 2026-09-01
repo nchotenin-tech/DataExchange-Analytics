@@ -23,7 +23,9 @@ def _fmt(v, dec=2):
 
 
 def _rows(t: dict):
-    data = [r for r in t["rows"] if str(r.get("row")) != "รวม"]
+    # แถวย่อยรายอายุ (_sub) ไม่นับในสรุปประเด็น ไม่งั้นจะนับซ้ำกับช่วงอายุที่มันสังกัด
+    data = [r for r in t["rows"]
+            if str(r.get("row")) != "รวม" and not r.get("_sub")]
     total = next((r for r in t["rows"] if str(r.get("row")) == "รวม"), None)
     return data, total
 
