@@ -62,7 +62,7 @@ h1{font-size:21px;margin:0 0 3px}
 #topExport{margin-left:auto}
 span.xp{margin-left:auto;display:inline-flex;gap:7px;flex:0 0 auto}
 h2 .mini.right + .xp{margin-left:10px}
-a.dl.sm{font-size:11.5px;padding:5px 11px;font-weight:600}
+.dl.sm{font-size:11.5px;padding:5px 11px;font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:26px}
 .card{background:var(--panel);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh)}
 .card .k{font-size:11.5px;color:var(--muted)}
@@ -227,11 +227,16 @@ td.drill:hover{background:#e8f4ff;text-decoration-color:#1f6fb2}
 .sheet .bar input{flex:1;font-family:inherit;font-size:13px;padding:8px 12px;
   border:1px solid var(--line);border-radius:9px;outline:none;background:#fff}
 .sheet .bar input:focus{border-color:var(--sky)}
-a.dl{font-size:12.5px;padding:8px 14px;border-radius:9px;text-decoration:none;
+/* ใช้ได้ทั้ง <a> และ <button> — เดิมเขียนเป็น a.dl ทำให้ปุ่มไม่ได้สไตล์เลย */
+.dl{display:inline-flex;align-items:center;gap:5px;font-family:inherit;line-height:1.5;
+  font-size:12.5px;padding:8px 14px;border-radius:9px;text-decoration:none;
   border:1px solid #cfe6f7;color:#2f6fa8;background:#fff;white-space:nowrap;cursor:pointer}
-a.dl:hover{background:#eaf5fd}
-a.dl.primary{background:#1cbfa0;border-color:#1cbfa0;color:#fff}
-a.dl.primary:hover{background:#16a88c}
+.dl:hover{background:#eaf5fd;border-color:#a9d4f2}
+.dl:active{transform:translateY(1px)}
+.dl:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+.dl.primary{background:#1cbfa0;border-color:#1cbfa0;color:#fff}
+.dl.primary:hover{background:#16a88c;border-color:#16a88c}
+.dl.on{background:#eaf5fd;border-color:var(--sky);color:var(--sky);font-weight:600}
 /* ป๊อปอัพกราฟขนาดใหญ่ */
 .zsheet{width:min(1000px,100%)}
 .zbody{overflow:auto;padding:16px 22px 22px}
@@ -311,6 +316,89 @@ tr.clickable:hover td:first-child{background:#eaf5ff}
 td .code{display:inline-block;font-size:11px;color:var(--muted);background:#f2f7fb;
   border-radius:5px;padding:0 5px;margin-right:2px}
 td.pct2{color:#0d9488;font-weight:600}
+
+/* ---------- แท็บถาม-ตอบ ---------- */
+.askbar{display:flex;gap:8px;margin-bottom:12px}
+.askbar input{flex:1;font-family:inherit;font-size:14px;padding:11px 14px;
+  border:1px solid var(--line);border-radius:var(--r2);background:#fff;color:var(--ink);
+  outline:none;box-shadow:var(--sh)}
+.askbar input:focus{border-color:var(--sky);box-shadow:0 0 0 3px rgba(47,159,220,.18)}
+.askbar button{font-family:inherit;font-size:14px;font-weight:600;padding:11px 20px;
+  border:0;border-radius:var(--r2);background:linear-gradient(160deg,#2f9fdc,#4f46e5);
+  color:#fff;cursor:pointer;box-shadow:var(--sh)}
+.askbar button:disabled{opacity:.55;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chips button{font-family:inherit;font-size:12px;padding:5px 11px;cursor:pointer;
+  border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink2)}
+.chips button:hover{border-color:var(--sky);color:var(--sky)}
+.answer{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 18px;box-shadow:var(--sh);margin-bottom:12px}
+.answer .txt{font-size:15px;line-height:1.85;white-space:pre-wrap}
+.answer .q{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.answer .meta{font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;
+  border-top:1px dashed var(--line);line-height:1.8}
+.answer .meta b{color:var(--ink2);font-weight:600}
+.aitag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;
+  border-radius:999px;background:#eef7f4;color:#0d9488;margin-left:6px}
+.aitag.rules{background:#fdf6ec;color:#b26a00}
+
+/* ---------- กล่องยืนยันก่อนส่งข้อมูลออก ---------- */
+.confirm{background:#fffbf3;border:1px solid #f0d9a8;border-radius:var(--r);
+  padding:16px 18px;box-shadow:var(--sh);margin-bottom:12px}
+.confirm.local{background:#f2fbf8;border-color:#a8e0d2}
+.confirm h4{margin:0 0 10px;font-size:14.5px;color:#8a5a00}
+.confirm.local h4{color:#0d7d68}
+.confirm dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0 0 12px;
+  font-size:12.5px;color:var(--ink2)}
+.confirm dt{color:var(--muted)}
+.confirm dd{margin:0;word-break:break-all}
+.confirm pre{background:#fff;border:1px solid var(--line);border-radius:var(--r2);
+  padding:11px 13px;margin:0 0 10px;font-size:11.5px;line-height:1.65;max-height:260px;
+  overflow:auto;white-space:pre-wrap;word-break:break-word;
+  font-family:"Cascadia Mono",Consolas,"Courier New",monospace}
+.confirm .lbl{font-size:11.5px;color:var(--muted);margin:0 0 4px;font-weight:600}
+.confirm .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.confirm button{font-family:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;
+  border-radius:var(--r2);border:0;cursor:pointer}
+.confirm button.go{background:linear-gradient(160deg,#2f9fdc,#4f46e5);color:#fff}
+.confirm button.no{background:#fff;border:1px solid var(--line);color:var(--ink2)}
+.confirm button.fmt{background:#fff;border:1px solid var(--line);color:var(--muted);
+  font-size:11.5px;padding:4px 10px;font-weight:500}
+.outbox{font-size:12px;color:var(--ink2)}
+.outbox td{padding:5px 9px}
+
+/* ---------- หน้าตั้งค่า AI ---------- */
+.aiset{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 18px;box-shadow:var(--sh);margin-bottom:14px}
+.aiset h3{margin:0 0 12px;font-size:14.5px;color:var(--ink)}
+.modes{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.modes label{flex:1 1 220px;display:flex;gap:9px;align-items:flex-start;cursor:pointer;
+  border:1.5px solid var(--line);border-radius:var(--r2);padding:11px 13px;background:#fff}
+.modes label:hover{border-color:#bcdcf5}
+.modes label.on{border-color:var(--sky);background:#f4fbff}
+.modes input{margin-top:3px;accent-color:var(--sky);cursor:pointer}
+.modes b{display:block;font-size:13px;color:var(--ink)}
+.modes span{display:block;font-size:11.5px;color:var(--muted);line-height:1.55}
+.frm{display:grid;grid-template-columns:132px 1fr;gap:9px 12px;align-items:center;
+  margin-bottom:12px}
+.frm label{font-size:12.5px;color:var(--ink2)}
+.frm input,.frm select{font-family:inherit;font-size:13px;padding:8px 11px;width:100%;
+  border:1px solid var(--line);border-radius:var(--r2);background:#fff;color:var(--ink);
+  outline:none}
+.frm input:focus,.frm select:focus{border-color:var(--sky);
+  box-shadow:0 0 0 3px rgba(47,159,220,.15)}
+.frm .row{display:flex;gap:8px;align-items:center}
+.frm .hint{grid-column:2;font-size:11.5px;color:var(--muted);margin:-4px 0 2px}
+.aiset .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.aiset .acts button{font-family:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;
+  border-radius:var(--r2);border:0;cursor:pointer}
+.aiset .acts button.save{background:linear-gradient(160deg,#2f9fdc,#4f46e5);color:#fff}
+.aiset .acts button.alt{background:#fff;border:1px solid var(--line);color:var(--ink2)}
+.aiset .msg2{font-size:12.5px;padding:8px 12px;border-radius:var(--r2);margin-top:10px}
+.aiset .msg2.good{background:#eef7f4;color:#0d7d68}
+.aiset .msg2.bad{background:#ffe9e5;color:#b3261e}
+.aiset .warn{font-size:12px;color:#8a5a00;background:#fffbf3;border:1px solid #f0d9a8;
+  border-radius:var(--r2);padding:9px 12px;margin-bottom:12px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -764,6 +852,507 @@ async function loadEda() {
   }
 }
 
+// ---------- แท็บถาม-ตอบ ----------
+let ASK_STATUS = null, ASK_LOG = [];
+
+const ASK_SAMPLES = ['caries free ของอายุ 3 ขวบ', 'ปราศจากฟันผุ 3-5 ปี รายอำเภอ',
+  'ฟันผุไม่ได้รักษา อายุ 5 ปี', 'ค่าเฉลี่ยฟันผุถอนอุด อายุ 4 ปี',
+  'อำเภอไหนปราศจากฟันผุน้อยที่สุด'];
+
+function askScopeText(s) {
+  if (!s) return 'ทั้งหมด';
+  if (s.hos) return s.hos_name || s.hos;
+  if (s.amp) return 'อำเภอ' + s.amp;
+  if (s.pv) return 'จังหวัด' + s.pv;
+  return 'ทุกพื้นที่ในข้อมูล';
+}
+
+function renderAnswer(a) {
+  const r = a.result, t = r.total;
+  const isMean = t.kind === 'mean';
+  const groups = (r.groups || []).map((g, i) =>
+    `<tr><td>${i + 1}</td><td>${esc(g.name)}</td>
+      <td class="num pct2">${fmt(isMean ? g.mean : g.pct, 2)}${isMean ? '' : '%'}</td>
+      <td class="num">${fmt(isMean ? g.sum : g.count)}</td>
+      <td class="num">${fmt(g.base)}</td></tr>`).join('');
+  const tag = a.planner === 'ai'
+    ? '<span class="aitag">AI</span>'
+    : '<span class="aitag rules">คีย์เวิร์ด</span>';
+  return `<div class="answer">
+    <div class="q">❓ ${esc(a.question)}${tag}</div>
+    <div class="txt">${esc(a.text)}</div>
+    ${groups ? `<div class="tw" style="margin-top:12px"><table><thead><tr>
+        <th>#</th><th>${esc(r.group_by || 'พื้นที่')}</th>
+        <th class="num">${isMean ? 'ค่าเฉลี่ย' : 'ร้อยละ'}</th>
+        <th class="num">${isMean ? 'รวมซี่' : 'จำนวน'}</th><th class="num">ฐาน</th>
+      </tr></thead><tbody>${groups}</tbody></table></div>` : ''}
+    <div class="meta">
+      <b>ที่มาของตัวเลข:</b> ${esc(r.profile.label)} ·
+      ตารางที่ ${esc(r.table.no)} ${esc(r.table.title)} ·
+      ตัวชี้วัด "${esc(r.metric)}" · แถว ${esc((r.rows || []).join(', '))} ·
+      ขอบเขต ${esc(askScopeText(r.scope))}
+      ${(r.conditions || []).length
+        ? '<br><b>เงื่อนไข:</b> ' + r.conditions.map(esc).join(' · ') : ''}
+      ${a.spec && a.spec._ai_error
+        ? '<br><b>หมายเหตุ:</b> เรียก AI ไม่สำเร็จ จึงใช้ตัวแปลแบบคีย์เวิร์ดแทน'
+        : ''}
+      ${a.declined
+        ? '<br><b>หมายเหตุ:</b> คุณไม่ได้ส่งตัวเลขให้ AI เรียบเรียง — ' +
+          'ตัวเลขนี้คำนวณในเครื่องทั้งหมด'
+        : ''}
+    </div></div>`;
+}
+
+// ---------- กล่องยืนยันก่อนส่งข้อมูลออกนอกเครื่อง ----------
+let ASK_PRETTY = false;
+
+async function postJSON(url, body) {
+  const res = await fetch(url, {method: 'POST',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const d = await res.json();
+  if (!res.ok || d.error) throw new Error(d.error || res.statusText);
+  return d;
+}
+
+// จัดรูปแบบให้อ่านง่าย — ไม่ใช่รูปแบบที่ส่งจริง (ของจริงเขียนติดกันเพื่อประหยัด token)
+function prettyBody(s) {
+  if (!ASK_PRETTY) return s;
+  try { return JSON.stringify(JSON.parse(s), null, 2); } catch (e) { return s; }
+}
+
+function renderConfirm(o, note) {
+  return `<div class="confirm${o.local ? ' local' : ''}">
+    <h4>${o.local ? '🖥 ส่งให้โมเดลในเครื่อง — ไม่ออกอินเทอร์เน็ต'
+                  : '🔒 กำลังจะส่งข้อมูลนี้ออกไปนอกเครื่อง'}</h4>
+    <dl>
+      <dt>ปลายทาง</dt><dd>${esc(o.endpoint)}</dd>
+      <dt>โมเดล</dt><dd>${esc(o.model || '-')}</dd>
+      <dt>กุญแจ</dt><dd>${esc(o.api_key)}</dd>
+      <dt>ขนาด</dt><dd>${fmt(o.bytes)} ไบต์</dd>
+    </dl>
+    ${note ? `<div class="lbl">${note}</div>` : ''}
+    <div class="lbl">คำสั่งระบบ</div>
+    <pre>${esc(o.system)}</pre>
+    <div class="lbl">เนื้อหาที่ส่ง — ทั้งหมด ไม่ตัดทอน</div>
+    <pre class="body">${esc(prettyBody(o.user))}</pre>
+    <div class="acts">
+      <button class="go">ยืนยันส่ง</button>
+      <button class="no">ยกเลิก</button>
+      <button class="fmt">${ASK_PRETTY ? 'ดูแบบที่ส่งจริง' : 'จัดให้อ่านง่าย'}</button>
+    </div></div>`;
+}
+
+// คืน true เมื่อผู้ใช้กดยืนยัน — ก่อนหน้านั้นไม่มีอะไรถูกส่งออกไป
+function askConfirm(o, note) {
+  return new Promise(resolve => {
+    const box = $('#body').querySelector('#askOut');
+    box.insertAdjacentHTML('afterbegin', renderConfirm(o, note));
+    const el = box.firstElementChild;
+    el.querySelector('.go').onclick = () => { el.remove(); resolve(true); };
+    el.querySelector('.no').onclick = () => { el.remove(); resolve(false); };
+    el.querySelector('.fmt').onclick = ev => {
+      ASK_PRETTY = !ASK_PRETTY;
+      el.querySelector('pre.body').textContent = prettyBody(o.user);
+      ev.target.textContent = ASK_PRETTY ? 'ดูแบบที่ส่งจริง' : 'จัดให้อ่านง่าย';
+    };
+    // เลื่อนให้เห็นกล่อง — ห้ามให้พังทั้งฟังก์ชันถ้าเบราว์เซอร์ไม่รองรับ
+    try { el.scrollIntoView({block: 'nearest', behavior: 'smooth'}); } catch (e) {}
+  });
+}
+
+async function runAsk(q) {
+  q = String(q || '').trim();
+  const pane = $('#body').querySelector('.pane[data-tab=ask]');
+  if (!pane || !q) return;
+  const box = pane.querySelector('#askOut');
+  const btn = pane.querySelector('#askGo');
+  btn.disabled = true;
+  try {
+    // จังหวะ 1 — ดูก่อนว่าจะส่งอะไรออกไป (ยังไม่ส่ง)
+    const pv = await postJSON('/api/ask/preview', {q});
+    let token = null;
+    if (pv.outbound) {
+      const ok = await askConfirm(pv.outbound,
+        'AI จะเห็นแค่นี้: ชื่อกลุ่มอายุ ชื่อตาราง ชื่อตัวชี้วัด และคำถามของคุณ ' +
+        '— ไม่มีข้อมูลเด็กและไม่มีตัวเลขผลลัพธ์');
+      if (!ok) {
+        ASK_LOG.unshift(`<div class="answer"><div class="q">❓ ${esc(q)}</div>
+          <div class="txt">ยกเลิกแล้ว — ไม่มีข้อมูลถูกส่งออกไป</div></div>`);
+        box.innerHTML = ASK_LOG.join('');
+        return;
+      }
+      token = pv.token;
+    }
+    // จังหวะ 2 — แปลคำถาม (ถ้ายืนยัน) แล้วคำนวณในเครื่อง
+    box.innerHTML = '<div class="msg">กำลังคิด…</div>' + ASK_LOG.join('');
+    const a = await postJSON('/api/ask', token ? {token} : {q});
+    // จังหวะ 3 — ก้อนที่มีตัวเลข ต้องยืนยันอีกครั้ง
+    if (a.next) {
+      box.innerHTML = ASK_LOG.join('');
+      const ok2 = await askConfirm(a.next,
+        '⚠ ก้อนนี้มี "ตัวเลขสรุป" อยู่ด้วย (ส่งไปให้ AI เรียบเรียงเป็นประโยค) ' +
+        '— กดยกเลิกได้ คำตอบจะแสดงเป็นรูปแบบมาตรฐานแทน ตัวเลขเท่ากันทุกประการ');
+      if (ok2) {
+        const t = await postJSON('/api/ask/phrase', {token: a.next_token});
+        if (t.text) { a.text = t.text; a.phrased = true; }
+      } else {
+        a.declined = true;
+      }
+    }
+    ASK_LOG.unshift(renderAnswer(a));
+  } catch (e) {
+    ASK_LOG.unshift(`<div class="answer"><div class="q">❓ ${esc(q)}</div>
+      <div class="err">${esc(e.message)}</div></div>`);
+  }
+  box.innerHTML = ASK_LOG.join('');
+  btn.disabled = false;
+}
+
+// ---------- หน้าตั้งค่า AI ----------
+let AI_CFG = null, AI_PROVIDERS = [], AI_MODELS = {models: [], live: false, error: ''};
+
+function renderAiSettings() {
+  const c = AI_CFG || {}, cur = c.provider || 'off';
+  const modes = AI_PROVIDERS.map(p => `
+    <label class="${p.id === cur ? 'on' : ''}">
+      <input type="radio" name="aiprov" value="${esc(p.id)}"
+             ${p.id === cur ? 'checked' : ''}>
+      <span><b>${esc(p.label)}</b>${p.note ? esc(p.note) : ''}</span>
+    </label>`).join('');
+
+  const p = AI_PROVIDERS.find(x => x.id === cur) || {};
+  const opts = AI_MODELS.models.map(m =>
+    `<option value="${esc(m)}"${m === c.model ? ' selected' : ''}>${esc(m)}</option>`).join('');
+  const custom = c.model && !AI_MODELS.models.includes(c.model)
+    ? `<option value="${esc(c.model)}" selected>${esc(c.model)} (พิมพ์เอง)</option>` : '';
+
+  const detail = cur === 'off' ? '' : `
+    <div class="frm">
+      <label for="aiModel">โมเดล</label>
+      <div class="row">
+        <select id="aiModel">${custom}${opts}</select>
+        <button class="dl sm" id="aiModelRefresh" type="button">↻</button>
+        <button class="dl sm" id="aiModelCustom" type="button">พิมพ์เอง</button>
+      </div>
+      ${AI_MODELS.error ? `<div class="hint" style="color:#b3261e">${esc(AI_MODELS.error)}</div>`
+        : AI_MODELS.live ? '<div class="hint">อ่านจากเครื่องจริง — โมเดลที่ลงไว้แล้ว</div>'
+        : '<div class="hint">เลือกจากรายการ หรือกด “พิมพ์เอง” ถ้าใช้โมเดลอื่น</div>'}
+
+      ${p.needs_key ? `
+      <label for="aiKey">API key</label>
+      <input id="aiKey" type="password" autocomplete="off"
+             placeholder="${c.has_key ? 'ตั้งไว้แล้ว: ' + esc(c.key_hint) + ' (เว้นว่าง = ไม่เปลี่ยน)'
+                                      : 'วางกุญแจที่นี่'}">
+      <div class="hint">เก็บลง <code>${esc(c.config_file || 'ai.yaml')}</code>
+        ในเครื่องคุณ · ไฟล์นี้ถูกกันไม่ให้ commit ไว้แล้ว
+        ${c.has_key ? '· <a href="#" id="aiClearKey">ลบกุญแจ</a>' : ''}
+        ${c.key_from_env ? '<br>⚠ มี DENTALDX_AI_KEY ตั้งไว้ที่ environment ซึ่งจะทับค่าในไฟล์'
+                         : ''}</div>` : ''}
+
+      <label for="aiUrl">Base URL</label>
+      <input id="aiUrl" value="${esc(c.base_url || '')}"
+             placeholder="${cur === 'ollama' ? 'http://127.0.0.1:11434' : 'ปล่อยว่าง = ค่ามาตรฐาน'}">
+      <div class="hint">ใช้เมื่อผ่าน proxy ของหน่วยงาน หรือ Ollama อยู่คนละเครื่อง</div>
+
+      <label>ตัวเลือก</label>
+      <div class="row" style="flex-wrap:wrap;gap:14px">
+        <label class="chk"><input type="checkbox" id="aiConfirm"
+          ${c.confirm !== false ? 'checked' : ''}> โชว์ข้อมูลที่จะส่งแล้วรอกดยืนยัน</label>
+        <label class="chk"><input type="checkbox" id="aiPhrase"
+          ${c.phrase !== false ? 'checked' : ''}> ให้ AI เรียบเรียงประโยคตอบ</label>
+      </div>
+      <div class="hint">ปิด “เรียบเรียงประโยค” แล้ว <b>ตัวเลขจะไม่ถูกส่งออกนอกเครื่องเลย</b>
+        และประหยัดโควตาไปครึ่งหนึ่ง</div>
+    </div>`;
+
+  const warn = (cur === 'gemini' && c.phrase !== false)
+    ? `<div class="warn">⚠ <b>Gemini free tier</b>: Google ระบุว่า prompt และคำตอบของบริการ
+       ที่ไม่เสียเงินอาจถูกนำไปพัฒนาผลิตภัณฑ์ และอาจมีคนเข้ามาอ่าน<br>
+       ถ้าใช้แบบฟรี แนะนำให้ <b>ปิด “ให้ AI เรียบเรียงประโยคตอบ”</b>
+       เพื่อไม่ให้ตัวเลขออกจากเครื่อง หรือผูกบัญชีเป็น paid tier</div>` : '';
+
+  return `<div class="aiset">
+    <h3>⚙ ตั้งค่าการถาม-ตอบ</h3>
+    <div class="modes">${modes}</div>
+    ${warn}${detail}
+    <div class="acts">
+      <button class="save" id="aiSave">บันทึก</button>
+      <button class="alt" id="aiTest">ทดสอบการเชื่อมต่อ</button>
+      <button class="alt" id="aiClose">ปิด</button>
+    </div>
+    <div id="aiMsg"></div>
+  </div>`;
+}
+
+// ส่งกุญแจไปทาง POST (ไม่ใส่ใน URL) เผื่อผู้ใช้เพิ่งพิมพ์แต่ยังไม่ได้บันทึก
+async function loadAiModels(provider, baseUrl, apiKey) {
+  if (!provider || provider === 'off') { AI_MODELS = {models: [], live: false, error: ''}; return; }
+  try {
+    AI_MODELS = await postJSON('/api/ask/models',
+      {provider, base_url: baseUrl || '', api_key: apiKey || ''});
+  } catch (e) { AI_MODELS = {models: [], live: false, error: e.message}; }
+}
+
+function bindAiSettings() {
+  const box = $('#body').querySelector('#aiSet');
+  if (!box) return;
+  const msg = box.querySelector('#aiMsg');
+  const say = (txt, ok) => msg.innerHTML =
+    `<div class="msg2 ${ok ? 'good' : 'bad'}">${esc(txt)}</div>`;
+
+  // อ่านค่าที่ "อยู่บนหน้าจอตอนนี้" (อาจยังไม่ได้บันทึก)
+  const formValues = () => {
+    const g = id => box.querySelector('#' + id);
+    const body = {provider: AI_CFG.provider};
+    if (AI_CFG.provider !== 'off') {
+      body.model = AI_CFG.model || '';
+      body.base_url = g('aiUrl') ? g('aiUrl').value.trim() : '';
+      body.confirm = g('aiConfirm') ? g('aiConfirm').checked : true;
+      body.phrase = g('aiPhrase') ? g('aiPhrase').checked : true;
+      if (g('aiKey') && g('aiKey').value.trim()) body.api_key = g('aiKey').value.trim();
+    }
+    return body;
+  };
+
+  // มีอะไรบนหน้าจอที่ยังไม่ได้บันทึกหรือเปล่า
+  const isDirty = () => {
+    const f = formValues(), c = AI_CFG || {};
+    if (f.provider !== c.provider) return true;
+    if (f.provider === 'off') return false;
+    return (f.model || '') !== (c.model || '')
+        || (f.base_url || '') !== (c.base_url || '')
+        || f.confirm !== (c.confirm !== false)
+        || f.phrase !== (c.phrase !== false)
+        || !!f.api_key;
+  };
+
+  box.querySelectorAll('input[name=aiprov]').forEach(r => {
+    r.onchange = async () => {
+      AI_CFG = Object.assign({}, AI_CFG, {provider: r.value});
+      const p = AI_PROVIDERS.find(x => x.id === r.value) || {};
+      // เปลี่ยนผู้ให้บริการ -> โมเดลเดิมใช้ไม่ได้ ต้องเลือกใหม่
+      const k0 = box.querySelector('#aiKey');
+      await loadAiModels(r.value, AI_CFG.base_url, k0 ? k0.value : '');
+      if (!AI_MODELS.models.includes(AI_CFG.model)) AI_CFG.model = AI_MODELS.models[0] || '';
+      AI_CFG.needs_key = !!p.needs_key;
+      box.innerHTML = renderAiSettings();
+      bindAiSettings();
+    };
+  });
+
+  // บอกให้เห็นว่ามีอะไรยังไม่ได้บันทึก (เดิมกดทดสอบแล้วงงว่าทำไมยังเป็นโหมดเก่า)
+  const save = box.querySelector('#aiSave');
+  const refreshDirty = () => {
+    const d = isDirty();
+    save.textContent = d ? 'บันทึก •' : 'บันทึก';
+    save.title = d ? 'มีการแก้ไขที่ยังไม่ได้บันทึก' : '';
+  };
+  box.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('input', refreshDirty);
+    el.addEventListener('change', refreshDirty);
+  });
+
+  const modelSel = box.querySelector('#aiModel');
+  if (modelSel) modelSel.onchange = () => { AI_CFG.model = modelSel.value; refreshDirty(); };
+
+  const refresh = box.querySelector('#aiModelRefresh');
+  if (refresh) refresh.onclick = async () => {
+    const url = box.querySelector('#aiUrl'), k = box.querySelector('#aiKey');
+    refresh.disabled = true;
+    say('กำลังดึงรายชื่อโมเดล…', true);
+    await loadAiModels(AI_CFG.provider, url ? url.value : '', k ? k.value : '');
+    // โมเดลที่เลือกไว้ไม่มีในรายการจริง = สาเหตุของ HTTP 404 ตอนใช้งาน
+    const gone = AI_MODELS.live && AI_CFG.model && !AI_MODELS.models.includes(AI_CFG.model);
+    const old = AI_CFG.model;
+    if (gone) AI_CFG.model = AI_MODELS.models[0] || '';
+    box.innerHTML = renderAiSettings(); bindAiSettings();
+    const m = box.querySelector('#aiMsg');
+    if (gone) {
+      m.innerHTML = `<div class="msg2 bad">โมเดล “${esc(old)}” ไม่มีให้ใช้แล้ว —
+        เปลี่ยนเป็น “${esc(AI_CFG.model)}” ให้แล้ว กด “บันทึก” เพื่อใช้ค่านี้</div>`;
+    } else if (AI_MODELS.live) {
+      m.innerHTML = `<div class="msg2 good">พบ ${AI_MODELS.models.length}
+        โมเดลที่กุญแจนี้ใช้ได้</div>`;
+    }
+  };
+
+  const custom = box.querySelector('#aiModelCustom');
+  if (custom) custom.onclick = () => {
+    const v = prompt('พิมพ์ชื่อโมเดล', AI_CFG.model || '');
+    if (v && v.trim()) {
+      AI_CFG.model = v.trim();
+      box.innerHTML = renderAiSettings(); bindAiSettings();
+    }
+  };
+
+  const clear = box.querySelector('#aiClearKey');
+  if (clear) clear.onclick = async ev => {
+    ev.preventDefault();
+    try {
+      const d = await postJSON('/api/ask/config', {clear_key: '1'});
+      AI_CFG = d.config; ASK_STATUS = null;
+      box.innerHTML = renderAiSettings(); bindAiSettings();
+      say('ลบกุญแจแล้ว', true);
+    } catch (e) { say(e.message, false); }
+  };
+
+  box.querySelector('#aiSave').onclick = async () => {
+    const body = formValues();
+    try {
+      const d = await postJSON('/api/ask/config', body);
+      AI_CFG = d.config; ASK_STATUS = null;
+      // บันทึกกุญแจแล้ว ดึงรายชื่อโมเดลจริงได้ จะได้รู้ทันทีถ้าเลือกโมเดลที่ไม่มีแล้ว
+      await loadAiModels(AI_CFG.provider, AI_CFG.base_url);
+      await loadAsk();                       // วาดแท็บใหม่ให้สถานะตรง
+      const b2 = $('#body').querySelector('#aiSet');
+      if (b2) {
+        b2.dataset.open = '1';
+        markOpen('aiSetBtn', true);       // loadAsk วาดปุ่มใหม่ ต้องทำเครื่องหมายซ้ำ
+        b2.innerHTML = renderAiSettings(); bindAiSettings();
+        const bad = AI_CFG.enabled && AI_MODELS.live && AI_CFG.model
+                    && !AI_MODELS.models.includes(AI_CFG.model);
+        b2.querySelector('#aiMsg').innerHTML = bad
+          ? `<div class="msg2 bad">บันทึกแล้ว แต่ปลายทางไม่มีโมเดล
+             “${esc(AI_CFG.model)}” — เลือกจากรายการที่ดึงมาใหม่แล้วบันทึกอีกครั้ง</div>`
+          : `<div class="msg2 good">บันทึกแล้ว — ${AI_CFG.enabled
+            ? 'ใช้ ' + esc(AI_CFG.provider) + ' / ' + esc(AI_CFG.model || '')
+            : (AI_CFG.needs_key && !AI_CFG.has_key
+               ? 'เลือก ' + esc(AI_CFG.provider) + ' ไว้แล้ว แต่ยังไม่ได้ใส่ API key จึงยังใช้โหมดคีย์เวิร์ดอยู่'
+               : 'โหมดไม่ใช้ AI — ไม่มีข้อมูลออกจากเครื่อง')}</div>`;
+      }
+    } catch (e) { say(e.message, false); }
+  };
+
+  box.querySelector('#aiTest').onclick = async () => {
+    const dirty = isDirty();
+    say('กำลังทดสอบ…', true);
+    try {
+      // ส่งค่าที่อยู่บนหน้าจอไปทดสอบ ไม่ใช่ค่าที่บันทึกไว้ (และไม่บันทึกให้ด้วย)
+      const d = await postJSON('/api/ask/test', formValues());
+      const where = d.provider ? ` (${esc(d.provider)} / ${esc(d.model || '')})` : '';
+      let txt = (d.ok ? '✓ ' : '✕ ') + esc(d.text) + where;
+      if (dirty) {
+        txt += d.ok ? ' — ค่านี้ยังไม่ได้บันทึก อย่าลืมกด “บันทึก”'
+                    : ' — ทดสอบจากค่าที่กรอกบนหน้าจอ (ยังไม่ได้บันทึก)';
+      }
+      msg.innerHTML = `<div class="msg2 ${d.ok ? 'good' : 'bad'}">${txt}</div>`;
+    } catch (e) { say(e.message, false); }
+  };
+
+  box.querySelector('#aiClose').onclick = () => {
+    box.innerHTML = ''; box.dataset.open = '0'; markOpen('aiSetBtn', false);
+  };
+}
+
+// ปุ่มต้องบอกได้ว่าแผงเปิดอยู่หรือปิดอยู่
+function markOpen(btnId, open) {
+  const b = $('#body').querySelector('#' + btnId);
+  if (b) b.classList.toggle('on', !!open);
+}
+
+async function toggleAiSettings() {
+  const box = $('#body').querySelector('#aiSet');
+  if (!box) return;
+  if (box.dataset.open === '1') {
+    box.innerHTML = ''; box.dataset.open = '0'; markOpen('aiSetBtn', false);
+    return;
+  }
+  box.dataset.open = '1';
+  markOpen('aiSetBtn', true);
+  box.innerHTML = '<div class="msg">กำลังอ่านค่าตั้ง…</div>';
+  try {
+    const d = await api('/api/ask/config');
+    AI_CFG = d.config; AI_PROVIDERS = d.providers;
+    await loadAiModels(AI_CFG.provider, AI_CFG.base_url);
+    box.innerHTML = renderAiSettings();
+    bindAiSettings();
+  } catch (e) {
+    box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+}
+
+// ---------- ประวัติสิ่งที่ส่งออกไปแล้วจริง ๆ ----------
+async function showOutbox() {
+  const el = $('#body').querySelector('#outbox');
+  if (!el) return;
+  if (el.dataset.open === '1') {
+    el.innerHTML = ''; el.dataset.open = '0'; markOpen('outboxBtn', false);
+    return;
+  }
+  el.dataset.open = '1';
+  markOpen('outboxBtn', true);
+  el.innerHTML = '<div class="msg">กำลังอ่าน…</div>';
+  try {
+    const d = await api('/api/ask/outbox');
+    if (!d.sent.length) {
+      el.innerHTML = '<div class="cond">ยังไม่มีอะไรถูกส่งออกไปในรอบนี้</div>';
+      return;
+    }
+    el.innerHTML = `<div class="tw"><table class="outbox"><thead><tr>
+      <th>เวลา</th><th>ขั้นตอน</th><th>ปลายทาง</th>
+      <th class="num">ไบต์</th><th class="num">ms</th><th>ผล</th>
+      </tr></thead><tbody>${d.sent.map(e => `<tr>
+        <td>${esc(e.time)}</td><td>${esc(e.step)}</td>
+        <td>${esc(e.local ? 'ในเครื่อง' : e.endpoint)}</td>
+        <td class="num">${fmt(e.bytes)}</td><td class="num">${fmt(e.ms)}</td>
+        <td>${e.ok ? '✓' : '✕ ' + esc(e.error || '')}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+}
+
+function renderAskPane() {
+  const s = ASK_STATUS || {};
+  let hint;
+  if (!s.enabled) {
+    hint = '🔒 ยังไม่ได้ตั้งค่า AI — ใช้ตัวแปลคำถามแบบคีย์เวิร์ดในเครื่อง ' +
+      '<b>ไม่มีข้อมูลออกจากเครื่องเลย</b> (ถามสั้น ๆ ตรง ๆ เช่น "ปราศจากฟันผุ 3 ปี") · ' +
+      'วิธีเปิดใช้ AI ดู docs/ถาม-ตอบด้วย-AI.md';
+  } else {
+    hint = `เชื่อมกับ <b>${esc(s.provider)}</b> (${esc(s.model || '')}) · ` +
+      (s.confirm ? '<b>จะแสดงข้อมูลที่จะส่งให้ตรวจก่อนทุกครั้ง</b> แล้วรอกดยืนยัน'
+                 : '⚠ ปิดการยืนยันไว้ (confirm: false) — ส่งทันทีโดยไม่ถาม') +
+      (s.phrase ? '' : ' · phrase: false → ตัวเลขไม่ถูกส่งออก');
+  }
+  return `<section>
+    <h2>💬 ถาม-ตอบ</h2>
+    <div class="cond" style="margin:0 0 12px 2px">${hint}</div>
+    <div class="askbar">
+      <input id="askQ" placeholder="เช่น  caries free ของอายุ 3 ขวบ" autocomplete="off">
+      <button id="askGo">ถาม</button>
+    </div>
+    <div class="chips">${ASK_SAMPLES.map(s2 =>
+      `<button data-q="${esc(s2)}">${esc(s2)}</button>`).join('')}</div>
+    <div style="margin:0 0 12px 2px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="dl" id="aiSetBtn" type="button">⚙ ตั้งค่า AI</button>
+      <button class="dl" id="outboxBtn" type="button">📤 ประวัติสิ่งที่ส่งออกไปแล้ว</button>
+    </div>
+    <div id="aiSet" data-open="0"></div>
+    <div id="outbox" data-open="0"></div>
+    <div id="askOut">${ASK_LOG.join('')}</div>
+  </section>`;
+}
+
+async function loadAsk() {
+  const pane = $('#body').querySelector('.pane[data-tab=ask]');
+  if (!pane) return;
+  if (!ASK_STATUS) {
+    try { ASK_STATUS = await api('/api/ask/status'); }
+    catch { ASK_STATUS = {enabled: false}; }
+  }
+  pane.innerHTML = renderAskPane();
+  const input = pane.querySelector('#askQ');
+  pane.querySelector('#askGo').onclick = () => runAsk(input.value);
+  input.onkeydown = ev => { if (ev.key === 'Enter') runAsk(input.value); };
+  pane.querySelectorAll('.chips button').forEach(b => {
+    b.onclick = () => { input.value = b.dataset.q; runAsk(b.dataset.q); };
+  });
+  pane.querySelector('#outboxBtn').onclick = showOutbox;
+  pane.querySelector('#aiSetBtn').onclick = toggleAiSettings;
+  input.focus();
+}
+
 // ---------- แท็บรายงาน ----------
 let ACTIVE_TAB = 'overview';
 
@@ -781,6 +1370,7 @@ function selectTab(id) {
     b.classList.toggle('on', b.dataset.tab === id);
   });
   if (id === 'eda') loadEda();      // คำนวณตอนเปิดแท็บครั้งแรกเท่านั้น
+  if (id === 'ask') loadAsk();
 }
 
 // ปุ่มส่งออกของแต่ละตาราง (which = 'overview' | เลขตาราง | 'all')
@@ -1216,7 +1806,8 @@ async function loadReport(refresh) {
     const tabs = [{id: 'overview', label: 'ภาพรวม', sub: 'เปรียบเทียบพื้นที่'}]
       .concat(r.tables.map(t => ({
         id: 't' + t.no, label: 'ตารางที่ ' + t.no, sub: shortTitle(t.title)})))
-      .concat([{id: 'eda', label: '🔍 สำรวจข้อมูล', sub: 'คุณภาพ · การกระจาย'}]);
+      .concat([{id: 'eda', label: '🔍 สำรวจข้อมูล', sub: 'คุณภาพ · การกระจาย'},
+               {id: 'ask', label: '💬 ถาม-ตอบ', sub: 'พิมพ์คำถามเป็นภาษาสนทนา'}]);
 
     $('#body').innerHTML =
       `<div class="tabbar">${tabs.map(x =>
@@ -1226,7 +1817,8 @@ async function loadReport(refresh) {
          ${renderOverview(areaRows, r.overview_labels, r.level)}</div>` +
       r.tables.map(t => `<div class="pane" data-tab="t${t.no}" hidden>
          ${renderTable(t)}</div>`).join('') +
-      '<div class="pane" data-tab="eda" hidden></div>';
+      '<div class="pane" data-tab="eda" hidden></div>' +
+      '<div class="pane" data-tab="ask" hidden></div>';
     EDA_CACHE = null;      // ขอบเขตอาจเปลี่ยน ต้องคำนวณใหม่
 
     // เลือกแท็บเดิมไว้ถ้ายังมีอยู่ (เช่นตอนเปลี่ยนพื้นที่)

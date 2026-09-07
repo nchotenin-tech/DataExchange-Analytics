@@ -10,6 +10,9 @@ cache/
 *.parquet
 *.pkl
 
+# กุญแจ API ของ AI — ห้าม commit (ตัวอย่างอยู่ที่ ai.yaml.example)
+ai.yaml
+
 # ไฟล์ส่งออกที่โปรแกรมสร้าง
 output/
 *.xlsx

@@ -19,6 +19,7 @@ import pandas as pd
 from flask import Flask, jsonify, render_template, request, send_file
 from flask.json.provider import DefaultJSONProvider
 
+from core import ask as ask_mod
 from core import eda as eda_mod
 from core import export
 from core import profiles as prof_mod
@@ -27,7 +28,7 @@ from core import service
 # PyInstaller: templates/static ถูก bundle ไว้ใน sys._MEIPASS
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 
 def _json_safe(o):
     """NaN / Infinity ไม่ใช่ JSON ที่ถูกต้อง — เบราว์เซอร์จะ parse ไม่ผ่าน
@@ -159,6 +160,162 @@ def api_eda():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+# --------------------------------------------------------------------------- #
+# ถาม-ตอบด้วยภาษาธรรมชาติ
+# --------------------------------------------------------------------------- #
+
+# คำขอที่เตรียมไว้รอผู้ใช้กดยืนยัน — เก็บในหน่วยความจำ หมดอายุใน 10 นาที
+# เก็บ "ตัวคำขอจริง" ไว้ ไม่ใช่รับจากหน้าเว็บตอนกดยืนยัน
+# เพื่อรับประกันว่าสิ่งที่ส่งออกไป = สิ่งที่โชว์ให้ดูเป๊ะ ๆ
+_PENDING: dict[str, dict] = {}
+_PENDING_TTL = 600
+
+
+def _stash(**kw) -> str:
+    import uuid
+    now = time.time()
+    for k, v in list(_PENDING.items()):
+        if now - v["_at"] > _PENDING_TTL:
+            del _PENDING[k]
+    token = uuid.uuid4().hex
+    _PENDING[token] = {"_at": now, **kw}
+    return token
+
+
+def _take(token: str) -> dict | None:
+    item = _PENDING.pop(str(token or ""), None)
+    if item and time.time() - item["_at"] <= _PENDING_TTL:
+        return item
+    return None
+
+
+def _ask_body():
+    body = request.get_json(silent=True) or {}
+    return str(body.get("q") or "").strip(), body
+
+
+@app.route("/api/ask/preview", methods=["POST"])
+def api_ask_preview():
+    """จังหวะที่ 1: บอกว่าจะส่งอะไรออกไปบ้าง — ยังไม่ส่ง"""
+    q, _ = _ask_body()
+    if not q:
+        return jsonify({"error": "กรุณาพิมพ์คำถาม"}), 400
+    try:
+        req = ask_mod.plan_request(q, load_profiles())
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+    if req is None:      # ไม่ได้ใช้ AI -> ไม่มีอะไรออกจากเครื่อง
+        return jsonify({"outbound": None, "token": None})
+    return jsonify({"outbound": req["display"], "token": _stash(req=req, q=q)})
+
+
+@app.route("/api/ask", methods=["POST"])
+@app.route("/api/ask/plan", methods=["POST"])
+def api_ask():
+    """จังหวะที่ 2: แปลคำถาม (ถ้ายืนยันแล้ว) + คำนวณในเครื่อง
+
+    ข้อมูลเด็กรายคนไม่เคยออกจากเครื่อง — ดูคำอธิบายใน core/ask.py
+    """
+    q, body = _ask_body()
+    item = _take(body.get("token"))
+    if item and not q:
+        q = item["q"]
+    if not q:
+        return jsonify({"error": "กรุณาพิมพ์คำถาม"}), 400
+    profs = load_profiles()
+    try:
+        spec = ask_mod.plan(q, profs, req=(item or {}).get("req"))
+        a = ask_mod.build_answer(q, spec, profs)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+    # เตรียมก้อนที่ 2 (เรียบเรียงคำตอบ) ไว้ให้ยืนยันต่อ — ก้อนนี้คือก้อนที่มีตัวเลข
+    nxt = ask_mod.phrase_request(q, a["result"])
+    if nxt is None:
+        a["next"] = None
+        a["next_token"] = None
+    elif body.get("auto") or not ask_mod.config().get("confirm", True):
+        a["text"] = ask_mod.phrase(q, a["result"], req=nxt)
+        a["next"] = None
+        a["next_token"] = None
+    else:
+        a["next"] = nxt["display"]
+        a["next_token"] = _stash(req=nxt, q=q)
+    return jsonify(a)
+
+
+@app.route("/api/ask/phrase", methods=["POST"])
+def api_ask_phrase():
+    """จังหวะที่ 3: ส่งตัวเลขสรุปให้ AI เรียบเรียง (เมื่อผู้ใช้ยืนยันแล้ว)"""
+    _, body = _ask_body()
+    item = _take(body.get("token"))
+    if not item:
+        return jsonify({"error": "คำขอหมดอายุแล้ว กรุณาถามใหม่"}), 400
+    try:
+        return jsonify({"text": ask_mod.send_request(item["req"],
+                                                     "เรียบเรียงคำตอบ").strip()})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
+
+
+@app.route("/api/ask/outbox")
+def api_ask_outbox():
+    """ประวัติสิ่งที่ส่งออกไปแล้วจริง ๆ ในรอบการทำงานนี้"""
+    return jsonify({"sent": ask_mod.OUTBOX})
+
+
+@app.route("/api/ask/status")
+def api_ask_status():
+    cfg = ask_mod.config(refresh=True)
+    return jsonify({"enabled": ask_mod.ai_enabled(),
+                    "provider": cfg.get("provider"),
+                    "confirm": bool(cfg.get("confirm", True)),
+                    "phrase": bool(cfg.get("phrase", True)),
+                    "model": cfg.get("model") if ask_mod.ai_enabled() else None})
+
+
+# --------------------------------------------------------------------------- #
+# หน้าตั้งค่า AI
+# --------------------------------------------------------------------------- #
+
+@app.route("/api/ask/config", methods=["GET", "POST"])
+def api_ask_config():
+    """อ่าน/บันทึกค่าตั้ง — ไม่เคยส่งกุญแจตัวจริงกลับไปให้หน้าเว็บ"""
+    if request.method == "GET":
+        return jsonify({"config": ask_mod.public_config(),
+                        "providers": ask_mod.PROVIDERS})
+    body = request.get_json(silent=True) or {}
+    try:
+        ask_mod.save_config(body)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"บันทึกไม่สำเร็จ: {type(e).__name__}: {e}"}), 500
+    return jsonify({"config": ask_mod.public_config(),
+                    "providers": ask_mod.PROVIDERS})
+
+
+@app.route("/api/ask/models", methods=["GET", "POST"])
+def api_ask_models():
+    """รายชื่อโมเดล — รับกุญแจที่ยังไม่ได้บันทึกมาทาง POST ได้ด้วย
+
+    (กุญแจไม่ควรอยู่ใน query string เพราะไปโผล่ใน log ของเซิร์ฟเวอร์)
+    """
+    body = request.get_json(silent=True) or {}
+    return jsonify(ask_mod.list_models(
+        body.get("provider") or request.args.get("provider", ""),
+        body.get("base_url") or request.args.get("base_url", ""),
+        body.get("api_key") or ""))
+
+
+@app.route("/api/ask/test", methods=["POST"])
+def api_ask_test():
+    """ทดสอบค่าที่ผู้ใช้กรอกอยู่บนหน้าจอ โดยไม่บันทึกอะไร"""
+    return jsonify(ask_mod.test_connection(request.get_json(silent=True) or {}))
 
 
 # --------------------------------------------------------------------------- #

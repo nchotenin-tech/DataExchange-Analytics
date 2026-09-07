@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import io
 import os
 import sys
 import tempfile
@@ -248,8 +249,244 @@ def main() -> int:
               f"ผ่านเกณฑ์ {s['qualified']} ตาราง {len(rep['tables'])} ✓")
         ok += 1
 
+    check_ask(profs)
+
     print(f"SMOKE TEST PASSED ({ok} profiles)")
     return 0
+
+
+def check_ask(profs) -> None:
+    """แท็บถาม-ตอบ: ตัวเลขต้องตรงกับตารางรายงานทุกช่อง และห้ามมีข้อมูลรายบุคคล
+    หลุดออกไปกับ prompt ที่ส่งให้ AI
+    """
+    import json
+    from core import ask, service
+
+    # 1) ตัวเลขที่ ask คำนวณ ต้องเท่ากับตารางรายงานทุกช่อง
+    n = 0
+    for pid, p in profs.items():
+        rep = service.report(p)
+        tabs = {t["no"]: t for t in rep["tables"]}
+        for t in p.tables:
+            rt = tabs[t.no]
+            names = (ask.QUALITY_METRICS if t.kind == "quality"
+                     else [m.name for m in t.metrics])
+            for row in rt["rows"]:
+                label = str(row["row"])
+                for name in names:
+                    got = ask.run_spec({"profile": pid, "table": t.no, "metric": name,
+                                        "rows": [label], "area": "",
+                                        "group_by": None}, profs)["total"]
+                    if t.kind == "quality":
+                        want = (row["จำนวนที่ตรวจ"] if name == "จำนวนที่ตรวจ"
+                                else row["จำนวนที่ผ่านเกณฑ์คุณภาพ"])
+                        want_pct = None if name == "จำนวนที่ตรวจ" else row["ร้อยละ"]
+                        assert got["count"] == want, \
+                            f"{pid}/ตารางที่ {t.no}/{label}/{name}: {got['count']} != {want}"
+                    elif t.kind == "mean":
+                        want_pct = None
+                        assert got["mean"] == row[name], \
+                            f"{pid}/ตารางที่ {t.no}/{label}/{name}: ค่าเฉลี่ยไม่ตรง"
+                    else:
+                        want_pct = row[f"{name}|ร้อยละ"]
+                        assert got["count"] == row[f"{name}|จำนวน"], \
+                            f"{pid}/ตารางที่ {t.no}/{label}/{name}: จำนวนไม่ตรง"
+                    assert want_pct is None or got.get("pct") == want_pct, \
+                        f"{pid}/ตารางที่ {t.no}/{label}/{name}: ร้อยละไม่ตรง"
+                    n += 1
+    print(f"  ถาม-ตอบ: ตัวเลขตรงกับตารางรายงาน {n} ช่อง ✓")
+
+    # 2) แคตตาล็อกที่ส่งให้ AI ต้องไม่มีข้อมูลรายบุคคล
+    blob = json.dumps(ask.catalog(profs), ensure_ascii=False)
+    for word in ("cid", "pid", "hoscode", "birth", "เลขบัตร", "นามสกุล"):
+        assert word not in blob, f"แคตตาล็อกที่ส่งให้ AI มีคำต้องห้าม: {word}"
+    print("  ถาม-ตอบ: prompt ที่ส่งให้ AI ไม่มีข้อมูลรายบุคคล ✓")
+
+    # 3) ตัวแปลคำถามแบบคีย์เวิร์ด (ใช้เมื่อไม่มี API key) ต้องยังตอบได้
+    pid0 = sorted(profs, key=lambda i: profs[i].age_min)[0]
+    p0 = profs[pid0]
+    age = p0.age_min + 1
+    a = ask.answer(f"ปราศจากฟันผุ อายุ {age} ปี", profs)
+    assert a["result"]["metric"] == "ปราศจากฟันผุ", "ตัวแปลคีย์เวิร์ดหาตัวชี้วัดไม่เจอ"
+    assert a["result"]["rows"] == [str(age)], "ตัวแปลคีย์เวิร์ดอ่านอายุไม่ถูก"
+    assert a["text"], "ไม่มีข้อความคำตอบ"
+    print(f"  ถาม-ตอบ: ตัวแปลคีย์เวิร์ดตอบ 'ปราศจากฟันผุ อายุ {age} ปี' ได้ ✓")
+
+    # 4) คำถามนอกเรื่องต้องตอบว่าไม่รู้ ไม่ใช่เดาตัวเลขมั่ว
+    try:
+        ask.answer("ราคาทองวันนี้เท่าไหร่", profs)
+        raise AssertionError("คำถามนอกเรื่องควรตอบว่าไม่เข้าใจ")
+    except ValueError:
+        pass
+    print("  ถาม-ตอบ: คำถามนอกเรื่องตอบว่าไม่เข้าใจ ✓")
+
+    # 4.5) โหมดไม่ใช้ AI ต้องอ่านเลขไทยและชื่อพื้นที่ไม่เต็มได้
+    pid0 = sorted(profs, key=lambda i: profs[i].age_min)[0]
+    p0 = profs[pid0]
+    words = {1: "หนึ่ง", 2: "สอง", 3: "สาม", 4: "สี่", 5: "ห้า"}
+    age = min(p0.age_max, 3)
+    if age in words:
+        r = ask._find_rows(f"ปราศจากฟันผุ อายุ{words[age]}ขวบ", p0)
+        assert r == [str(age)], f"อ่าน 'อายุ{words[age]}ขวบ' ไม่ออก ได้ {r}"
+        assert ask._find_rows("สามารถดูได้ไหม", p0) == ["รวม"], \
+            "'สามารถ' ไม่ควรถูกอ่านเป็นเลข 3"
+        print(f"  ถาม-ตอบ: อ่านเลขไทย 'อายุ{words[age]}ขวบ' -> {age} ✓")
+
+    tree = service.area_tree(service.get_dataset(p0))
+    amps = sorted({a for pv in tree for a in tree[pv]})
+    if amps:
+        full = amps[0]
+        short = full[:3]
+        same = [a for a in amps if a.startswith(short)]
+        try:
+            got = ask.resolve_area(f"ปราศจากฟันผุ อ.{short}", tree)
+            if len(same) == 1:
+                assert got["amp"] == full, f"'อ.{short}' ควรได้ {full} แต่ได้ {got['amp']}"
+                print(f"  ถาม-ตอบ: ชื่ออำเภอไม่เต็ม 'อ.{short}' -> {full} ✓")
+            else:
+                raise AssertionError(f"'อ.{short}' ตรงหลายอำเภอ ควรถามกลับ ไม่ใช่เดา")
+        except ask.Ambiguous:
+            assert len(same) > 1, "ไม่ควรบอกว่ากำกวมทั้งที่ตรงตัวเดียว"
+            print(f"  ถาม-ตอบ: ชื่อกำกวม 'อ.{short}' ({len(same)} อำเภอ) -> ถามกลับ ✓")
+
+    # 5) เตรียมคำขอแล้วต้อง "ยังไม่ส่ง" และกุญแจต้องไม่หลุดไปหน้าเว็บ
+    KEY = "AIzaSyTESTKEY0123456789"
+    saved_cfg, saved_http = ask._config_cache, ask._http_json
+    sent = []
+    ask._http_json = lambda *a, **k: sent.append(a[0]) or {}
+    ask._config_cache = {**ask.DEFAULTS, "provider": "gemini",
+                         "model": "gemini-2.0-flash", "api_key": KEY,
+                         "phrase": True, "confirm": True}
+    try:
+        req = ask.plan_request("ปราศจากฟันผุ 3 ปี", profs)
+        assert not sent, "plan_request ไม่ควรส่งอะไรออกไป"
+        assert KEY in req["url"], "url จริงต้องมีกุญแจ"
+        shown = json.dumps(req["display"], ensure_ascii=False)
+        assert KEY not in shown, "กุญแจหลุดไปกับข้อมูลที่โชว์บนหน้าจอ!"
+        assert req["display"]["body"] == json.dumps(req["payload"], ensure_ascii=False), \
+            "สิ่งที่โชว์ไม่ตรงกับสิ่งที่จะส่งจริง"
+        for word in ("cid", "เลขบัตร", "นามสกุล"):
+            assert word not in shown, f"ข้อมูลที่โชว์มีคำต้องห้าม: {word}"
+        print(f"  ถาม-ตอบ: เตรียมคำขอ {req['display']['bytes']:,} ไบต์ "
+              "โดยยังไม่ส่ง และกุญแจถูกปิดบัง ✓")
+
+        # phrase: false -> ต้องไม่มีคำขอก้อนที่มีตัวเลขเลย
+        res = ask.run_spec({"profile": list(profs)[0], "table": profs[list(profs)[0]].tables[0].no,
+                            "metric": ask.QUALITY_METRICS[0], "rows": ["รวม"],
+                            "area": "", "group_by": None}, profs)
+        assert ask.phrase_request("q", res) is not None, "phrase=true ควรมีก้อนที่ 2"
+        ask._config_cache["phrase"] = False
+        assert ask.phrase_request("q", res) is None, \
+            "phrase=false แล้วยังเตรียมส่งตัวเลขออกไป!"
+        assert not sent, "ยังไม่ควรมีอะไรถูกส่งออกไป"
+        print("  ถาม-ตอบ: phrase=false แล้วตัวเลขไม่ถูกเตรียมส่งออก ✓")
+
+        # 6) เลือก provider ไว้แต่ยังไม่ใส่กุญแจ = ต้องยังไม่เปิดใช้ AI
+        ask._config_cache = {**ask.DEFAULTS, "provider": "gemini", "api_key": ""}
+        assert not ask.ai_enabled(), "ไม่มีกุญแจแต่กลับเปิดใช้ AI"
+        ask._config_cache = {**ask.DEFAULTS, "provider": "ollama", "api_key": ""}
+        assert ask.ai_enabled(), "ollama ไม่ต้องใช้กุญแจ ควรเปิดใช้ได้"
+        print("  ถาม-ตอบ: ไม่มีกุญแจ -> ยังไม่เปิด AI · ollama ไม่ต้องมีกุญแจ ✓")
+    finally:
+        ask._config_cache, ask._http_json = saved_cfg, saved_http
+
+    # 7) หน้าตั้งค่าต้องไม่ส่งกุญแจกลับไปหน้าเว็บ (เขียนไฟล์ในที่ชั่วคราว)
+    import tempfile
+    KEY2 = "sk-ant-SECRET0123456789"
+    old_env = os.environ.get("DENTALDX_AI_CONFIG")
+    tmpdir = tempfile.mkdtemp()
+    os.environ["DENTALDX_AI_CONFIG"] = os.path.join(tmpdir, "ai.yaml")
+    saved_http_fn = ask._http
+    try:
+        # กันพลาด: เทสต์นี้รันบนเครื่องผู้ใช้ด้วย (release.bat เรียก)
+        # ห้ามเขียนทับ ai.yaml ตัวจริงที่มี api_key ของเขาเด็ดขาด
+        assert os.path.dirname(ask.config_path()) == tmpdir, \
+            "เทสต์กำลังจะเขียนทับ ai.yaml ตัวจริง!"
+        ask.save_config({"provider": "anthropic", "model": "claude-haiku-4-5",
+                         "api_key": KEY2})
+        pub = json.dumps(ask.public_config(), ensure_ascii=False)
+        assert KEY2 not in pub, "กุญแจหลุดไปกับค่าตั้งที่ส่งให้หน้าเว็บ!"
+        assert ask.config()["api_key"] == KEY2, "บันทึกกุญแจไม่สำเร็จ"
+        ask.save_config({"phrase": False})          # ไม่ได้ส่ง api_key มา
+        assert ask.config()["api_key"] == KEY2, "ไม่ส่งกุญแจมา ไม่ควรลบของเดิม"
+        ask.save_config({"clear_key": "1"})
+        assert not ask.config().get("api_key"), "สั่งลบกุญแจแล้วยังอยู่"
+        # เลือก provider ไว้แต่ไม่มีกุญแจ -> ยังไม่เปิดใช้ AI แต่ต้องจำสิ่งที่เลือกไว้
+        pub = ask.public_config()
+        assert pub["provider"] == "anthropic" and not pub["enabled"], \
+            "หน้าตั้งค่าควรจำ provider ที่เลือก แม้ยังใช้ไม่ได้เพราะไม่มีกุญแจ"
+        print("  ถาม-ตอบ: บันทึก/ลบกุญแจได้ · กุญแจไม่ออกไปหน้าเว็บ · จำ provider ที่เลือก ✓")
+
+        # 8) ปุ่ม "ทดสอบการเชื่อมต่อ" ต้องทดสอบค่าที่กรอกบนหน้าจอ ไม่ใช่ค่าที่บันทึกไว้
+        #    (เคยเป็นบั๊ก: เลือก gemini + ใส่กุญแจแล้วยังไม่กดบันทึก กดทดสอบ
+        #     กลับขึ้นว่า "โหมดไม่ใช้ AI" ทำให้ผู้ใช้งงว่าตั้งค่าไม่ติด)
+        ask.save_config({"provider": "off"})
+        assert ask.config()["provider"] == "off"
+        eff = ask.effective_config({"provider": "gemini", "model": "gemini-2.0-flash",
+                                    "api_key": "AIzaSyFORM123"})
+        assert eff["provider"] == "gemini" and eff["api_key"] == "AIzaSyFORM123", \
+            "ปุ่มทดสอบยังอ่านค่าที่บันทึกไว้ ไม่ใช่ค่าบนหน้าจอ"
+        assert ask.config()["provider"] == "off", "การทดสอบต้องไม่บันทึกค่าให้เอง"
+        r = ask.test_connection({"provider": "gemini", "model": "gemini-2.0-flash"})
+        assert not r["ok"] and "API key" in r["text"], \
+            "เลือก provider แต่ไม่มีกุญแจ ควรบอกว่ายังไม่ได้ใส่ API key"
+        # ช่องกุญแจว่าง = ใช้กุญแจที่บันทึกไว้ ไม่ใช่ถือว่าไม่มีกุญแจ
+        ask.save_config({"provider": "gemini", "model": "gemini-2.0-flash",
+                         "api_key": "AIzaSySAVED123"})
+        eff = ask.effective_config({"provider": "gemini", "model": "gemini-2.0-flash",
+                                    "api_key": ""})
+        assert eff["api_key"] == "AIzaSySAVED123", \
+            "ช่องกุญแจว่างควรใช้กุญแจที่บันทึกไว้"
+        print("  ถาม-ตอบ: ปุ่มทดสอบใช้ค่าบนหน้าจอ ไม่บันทึกให้เอง ✓")
+
+        # 9) error จากปลายทางต้องแปลเป็นภาษาที่บอกทางแก้ได้
+        #    (เคยขึ้นแค่ "HTTP Error 404: Not Found" ซึ่งเดาสาเหตุไม่ถูกเลย —
+        #     ที่จริงคือชื่อโมเดลถูกปลดระวางไปแล้ว)
+        import urllib.error as _ue
+        import urllib.request as _ur
+
+        ask._http_json = saved_http          # ต้องใช้ตัวจริง จะได้ผ่านชั้นแปล error
+        saved_urlopen = _ur.urlopen
+        try:
+            for code, must in ((404, "↻"), (401, "กุญแจ"), (429, "โควตา")):
+                def raiser(*a, _c=code, **k):
+                    raise _ue.HTTPError(
+                        "http://x", _c, "err", {},
+                        io.BytesIO(json.dumps(
+                            {"error": {"message": "detail from server"}}).encode()))
+                _ur.urlopen = raiser
+                r = ask.test_connection({"provider": "gemini", "model": "m",
+                                         "api_key": "k"})
+                assert not r["ok"], f"HTTP {code} ควรถือว่าไม่ผ่าน"
+                assert str(code) in r["text"] and must in r["text"], \
+                    f"ข้อความ HTTP {code} ไม่ได้บอกทางแก้: {r['text']}"
+                assert "HTTPError" not in r["text"], "ยังโชว์ชื่อคลาส exception ดิบ"
+                assert "detail from server" in r["text"], \
+                    "ควรแนบคำอธิบายที่ปลายทางส่งมาด้วย"
+        finally:
+            _ur.urlopen = saved_urlopen
+        print("  ถาม-ตอบ: แปล error 404/401/429 เป็นคำแนะนำที่ทำตามได้ ✓")
+
+        # โมเดลที่ตอบคำถามไม่ได้ (embedding) ต้องไม่โผล่ในรายการให้เลือก
+        ask._http = lambda *a, **k: {"models": [
+            {"name": "models/gemini-2.5-flash",
+             "supportedGenerationMethods": ["generateContent"]},
+            {"name": "models/text-embedding-004",
+             "supportedGenerationMethods": ["embedContent"]}]}
+        got = ask.list_models("gemini", api_key="k")
+        assert got["live"] and got["models"] == ["gemini-2.5-flash"], \
+            f"กรองรายชื่อโมเดลผิด: {got}"
+        print("  ถาม-ตอบ: ดึงรายชื่อโมเดลจากปลายทางจริง (กรองรุ่นที่ใช้ไม่ได้ออก) ✓")
+    finally:
+        path = ask.config_path()
+        if os.path.exists(path) and os.path.dirname(path) == tmpdir:
+            os.remove(path)
+        if old_env is None:
+            os.environ.pop("DENTALDX_AI_CONFIG", None)
+        else:
+            os.environ["DENTALDX_AI_CONFIG"] = old_env
+        ask._http = saved_http_fn          # คืนของที่ monkeypatch ไว้
+        ask._config_cache = None
 
 
 if __name__ == "__main__":
