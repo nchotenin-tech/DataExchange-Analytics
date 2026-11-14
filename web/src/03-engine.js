@@ -176,6 +176,21 @@
     return neg ? -out : out;
   }
 
+  /**
+   * ปัดเศษแบบ numpy (คูณ 10^d แล้ว rint) — ต่างจาก round() ของ Python
+   *
+   *   9.525 -> Python 9.53 แต่ numpy 9.52 (เพราะ 9.525*100 = 952.4999999999999)
+   *
+   * ฝั่ง eda.py คำนวณบน np.int64 ผลจึงไปทาง numpy ต้องใช้ตัวนี้ให้ตรงกัน
+   */
+  function roundNp(v, d) {
+    if (v === null || v === undefined || isNaN(v) || !isFinite(v)) return null;
+    var f = Math.pow(10, d), x = v * f;
+    var frac = x - Math.floor(x);
+    var r = (frac === 0.5) ? 2 * Math.round(x / 2) : Math.round(x);
+    return r / f;
+  }
+
   function denominatorMask(rows, spec, profile) {
     if (spec.kind === 'quality') return ones(rows.length);
     if (spec.denominator === 'qualified') return qualityMask(rows, profile);
@@ -309,6 +324,7 @@
     TOTAL_LABEL: TOTAL_LABEL, Profile: Profile, qualityMask: qualityMask,
     clampedAge: clampedAge, applyScope: applyScope, buildReport: buildReport,
     denominatorMask: denominatorMask, groups: groups, pct: pct, round: round,
+    roundNp: roundNp,
     ones: ones
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

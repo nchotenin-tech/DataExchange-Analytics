@@ -247,6 +247,9 @@ def categorical_profile(df: pd.DataFrame, labels: dict) -> list[dict]:
         vc = s.value_counts(dropna=True)
         if vc.empty:
             continue
+        # value_counts ใช้ quicksort — ค่าที่นับได้เท่ากันจะสลับลำดับได้ในแต่ละรอบ
+        # เรียงซ้ำด้วย (จำนวนมาก->น้อย, ชื่อค่า) ให้ผลคงที่
+        vc = vc.sort_index().sort_values(ascending=False, kind="mergesort")
         lut = labels.get(col, {})
         items = []
         for val, cnt in vc.head(MAX_CATEGORIES).items():
@@ -263,7 +266,9 @@ def categorical_profile(df: pd.DataFrame, labels: dict) -> list[dict]:
                           "pct": round(100 * rest / n, 2) if n else None})
         miss = int(s.isna().sum())
         out.append({
-            "column": col, "label": label, "distinct": int(vc.nunique()),
+            # จำนวน "ค่าที่ต่างกัน" ของคอลัมน์นี้
+            # (เดิมเขียน vc.nunique() ซึ่งนับจำนวนความถี่ที่ต่างกัน ไม่ใช่จำนวนค่า)
+            "column": col, "label": label, "distinct": int(len(vc)),
             "missing": miss,
             "missing_pct": round(100 * miss / n, 2) if n else None,
             "items": items,

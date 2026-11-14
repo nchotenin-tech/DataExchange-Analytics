@@ -11,11 +11,12 @@
   'use strict';
 
   var D = root.DataIO, EN = root.Engine, S = root.Service, Y = root.Yaml,
-      X = root.Xlsx, Save = root.Save;
+      X = root.Xlsx, Save = root.Save, Eda = root.Eda;
 
   var DATASETS = {};      // profileId -> {rows, header}  (ข้อมูลรายบุคคล)
   var PROFILES = {};      // profileId -> Engine.Profile
   var HOSPITALS = {};
+  var DICTIONARY = {};
   var HANDLES = [];       // File object ที่ผู้ใช้เลือกไว้ สำหรับปุ่มโหลดใหม่
   var LAST_KEY = 'dentaldx.lastReport.v1';
 
@@ -100,6 +101,7 @@
 
     // ใช้ hospitals.csv ที่วางไว้ข้างโปรแกรมก่อน (เผื่อมีหน่วยบริการใหม่)
     // ไม่มีก็ใช้ตารางที่ฝังมาในไฟล์ HTML
+    DICTIONARY = D.loadDictionary($('#embedded-dictionary').textContent);
     HOSPITALS = got.hospitals
       ? D.loadHospitals(await readText(got.hospitals))
       : D.expandHospitals(JSON.parse($('#embedded-hospitals').textContent));
@@ -177,6 +179,18 @@
       return pa && DATASETS[pa.id] ? S.areaTree(DATASETS[pa.id].rows) : {};
     }
 
+    if (path.indexOf('/api/eda') === 0) {
+      var pe = needProfile(q);
+      var dse = DATASETS[pe.id], scope2 = scopeOf(q);
+      var pop = S.filterArea(dse.rows, scope2.pv, scope2.amp, scope2.hos);
+      var scoped = EN.applyScope(pop, pe);
+      var level = (scope2.amp || scope2.hos) ? 'unit' : 'district';
+      var areaRows = (scope2.amp && !scope2.hos) ? S.byUnit(pop, pe) : S.byDistrict(pop, pe);
+      var ol = S.overviewSpec(pe);
+      return Eda.build(pop, scoped, pe, areaRows, level, DICTIONARY,
+                       {caries_free_label: ol.caries_free_label, dmft_label: ol.dmft_label});
+    }
+
     if (path.indexOf('/api/report') === 0) {
       var pr = needProfile(q);
       var rep = S.report(DATASETS[pr.id], pr, scopeOf(q));
@@ -191,7 +205,22 @@
       var scope = scopeOf(q);
       var res, title, meta = null;
 
-      if (kind === 'metric') {
+      if (kind === 'value') {
+        var col = q.get('col') || '', selv = q.get('sel') || 'outlier';
+        var numArg = function (k) {
+          var v = q.get(k);
+          return (v === null || v === '') ? null : parseFloat(v);
+        };
+        res = Eda.valueList(DATASETS[pp.id], pp, col, selv, {
+          pv: scope.pv, amp: scope.amp, hos: scope.hos, raw: raw,
+          lo: numArg('lo'), hi: numArg('hi'), hiExclusive: q.get('hix') === '1'
+        });
+        var lbl = '';
+        Eda.NUMERIC_CANDIDATES.forEach(function (c) { if (c[0] === col) lbl = c[1]; });
+        var what = Eda.VALUE_SELECTIONS[selv] || selv;
+        meta = {label: lbl || col, column: col, sel: selv, what: what};
+        title = (lbl || col) + ' — ' + what;
+      } else if (kind === 'metric') {
         var no = q.get('table') || '', met = q.get('metric') || '', rowv = q.get('row') || null;
         res = S.metricList(DATASETS[pp.id], pp, no, met, rowv, scope, raw);
         var rowtxt = (rowv && rowv !== EN.TOTAL_LABEL) ? 'อายุ ' + rowv : 'ทุกอายุ';

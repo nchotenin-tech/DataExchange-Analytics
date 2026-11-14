@@ -13,9 +13,9 @@ const SRC = path.join(HERE, 'src');
 
 const g = globalThis;
 for (const f of ['00-xlsx.js', '01-expr.js', '02-data.js', '03-engine.js',
-                 '04-service.js', '05-yaml.js'])
+                 '04-service.js', '05-yaml.js', '08-eda.js'])
   eval(fs.readFileSync(path.join(SRC, f), 'utf8'));
-const {Xlsx: X, DataIO: D, Engine: EN, Service: S, Yaml: Y} = g;
+const {Xlsx: X, DataIO: D, Engine: EN, Service: S, Yaml: Y, Eda: ED} = g;
 
 /** โหลดข้อมูลของ profile หนึ่งชุดจากโฟลเดอร์ data/<กลุ่ม>/ */
 async function loadProfile(p, folder, hospitals) {
@@ -45,6 +45,9 @@ async function loadProfile(p, folder, hospitals) {
 }
 
 const hospitals = D.loadHospitals(D.decodeText(fs.readFileSync(hospPath)));
+const dictPath = path.join(path.dirname(hospPath), 'dentalfile.csv');
+const dictionary = fs.existsSync(dictPath)
+  ? D.loadDictionary(D.decodeText(fs.readFileSync(dictPath))) : {};
 const got = {};
 for (const pf of fs.readdirSync(profDir).filter(f => /\.ya?ml$/.test(f)).sort()) {
   const spec = Y.load(fs.readFileSync(path.join(profDir, pf), 'utf8'));
@@ -68,7 +71,25 @@ for (const pf of fs.readdirSync(profDir).filter(f => /\.ya?ml$/.test(f)).sort())
           S.metricList(ds, p, t.no, met, lab, scope, false).rows.length;
     }
   }
+  const pop = S.filterArea(ds.rows, null, null, null);
+  const scopedAll = EN.applyScope(pop, p);
+  const ol = S.overviewSpec(p);
+  const eda = ED.build(pop, scopedAll, p, S.byDistrict(pop, p), 'district', dictionary,
+                       {caries_free_label: ol.caries_free_label, dmft_label: ol.dmft_label});
+  const edaClicks = {};
+  for (const card of eda.numeric.slice(0, 6)) {
+    for (const sel of ['outlier', 'zero', 'neg', 'extreme', 'iqr'])
+      edaClicks[`${card.column}|${sel}`] =
+        ED.valueList(ds, p, card.column, sel, {}).rows.length;
+    card.hist.slice(0, 2).forEach((h, bi) => {
+      edaClicks[`${card.column}|range|${bi}`] =
+        ED.valueList(ds, p, card.column, 'range',
+                     {lo: h.from, hi: h.to, hiExclusive: true}).rows.length;
+    });
+  }
+
   got[p.id] = {
+    eda: eda, eda_clicks: edaClicks,
     summary: rep.summary, districts: rep.districts,
     tables: rep.tables.map(t => ({
       no: t.no, columns: t.columns,
@@ -135,6 +156,32 @@ for (const pid of Object.keys(py)) {
       }
     });
   });
+
+  // ---- หน้าสำรวจข้อมูล (EDA) ----
+  if (P.eda) {
+    const walk = (a, b, where) => {
+      if (a === null || typeof a !== 'object') {
+        checked++;
+        if (!eq(a, b === undefined ? null : b)) fail2(where, a, b);
+        return;
+      }
+      if (Array.isArray(a)) {
+        if (!Array.isArray(b) || a.length !== b.length) {
+          fail2(where + '.length', a.length, Array.isArray(b) ? b.length : null);
+          return;
+        }
+        a.forEach((x, i) => walk(x, b[i], where + '[' + i + ']'));
+        return;
+      }
+      for (const k of Object.keys(a)) walk(a[k], (b || {})[k], where + '.' + k);
+    };
+    walk(P.eda, J.eda, pid + ' eda');
+    for (const k of Object.keys(P.eda_clicks || {})) {
+      checked++;
+      if (P.eda_clicks[k] !== J.eda_clicks[k])
+        fail2(`${pid} คลิก EDA ${k}`, P.eda_clicks[k], J.eda_clicks[k]);
+    }
+  }
 
   for (const k of Object.keys(P.clicks)) {
     checked++;

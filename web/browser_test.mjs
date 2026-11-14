@@ -140,3 +140,20 @@ const last=w.DX.loadLast();
 console.log('\nจำรายงานล่าสุด:', last? last.profile.label+' ตรวจแล้ว '+last.summary.examined:'ไม่มี');
 const blob=JSON.stringify(last||{});
 console.log('  มีข้อมูลรายบุคคลปนไหม:', /cid|เลขบัตร|lname|\bname\b/.test(blob)?'มี!!':'ไม่มี');
+
+/* ---- แท็บสำรวจข้อมูล (EDA) ---- */
+const edaBtn=[...w.document.querySelectorAll('button.tab')]
+  .find(b=>b.querySelector('b').textContent.includes('สำรวจข้อมูล'));
+console.log('\nแท็บสำรวจข้อมูล:', edaBtn? 'มี':'ไม่มี');
+if(edaBtn){
+  edaBtn.onclick(); await new Promise(r=>setTimeout(r,1500));
+  const ep=$('.pane[data-tab=eda]');
+  const txt=ep.textContent;
+  console.log('  กฎตรวจค่าผิดปกติ:', ep.querySelectorAll('table tbody tr').length, 'แถว');
+  console.log('  มีหัวข้อครบ:', ['ค่าผิดปกติ','การกระจาย','ความถี่','เทียบ']
+    .filter(k=>txt.includes(k)).length, '/ 4');
+  console.log('  มีกราฟ (svg):', ep.querySelectorAll('svg').length, 'รูป');
+  const card=ep.querySelector('[data-col]')||ep.querySelector('td.clickme');
+  if(card){ card.click(); await new Promise(r=>setTimeout(r,600));
+    console.log('  คลิกการ์ด -> รายชื่อ:', w.document.querySelectorAll('.mbody tbody tr').length,'แถว'); }
+}

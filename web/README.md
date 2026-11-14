@@ -19,11 +19,12 @@
 | `src/04-service.js` | ภาพรวมรายอำเภอ/หน่วยบริการ + รายชื่อเด็กที่ต้องติดตาม |
 | `src/05-yaml.js` | อ่าน `profiles/*.yaml` (js-yaml, MIT) |
 | `src/06-save.js` | เขียนไฟล์ `.xlsx` / `.csv` เอง (zip แบบไม่บีบอัด) |
+| `src/08-eda.js` | สำรวจข้อมูล (EDA) — ค่าผิดปกติ 13 กฎ, boxplot, ความถี่, heatmap |
 | `src/07-app.js` | ต่อหน้า dashboard เดิมเข้ากับการคำนวณในเครื่อง |
 
 หน้าจอใช้ `templates/index.html` ของเวอร์ชัน `.exe` **ชุดเดิมทั้งหมด**
 `build_webapp.py` แค่เปลี่ยน `api()` จากยิงไป Flask เป็นคำนวณในเครื่อง
-และตัดแท็บสำรวจข้อมูล (EDA) กับถาม-ตอบออก
+และตัดแท็บถาม-ตอบ (AI) ออก
 
 ## คำสั่ง
 
@@ -74,6 +75,10 @@ node web/parity_test.mjs data profiles reference/hospitals.csv /tmp/real.json
   ค่าว่างเหมือนกัน ไม่แปลงเป็น ค.ศ. ให้เอง
 - คอลัมน์ที่ไม่มีอยู่จริงในข้อมูลต้องไม่โผล่ในตารางรายชื่อ (เช่น "กลุ่มอายุ"
   มีเฉพาะกลุ่ม 0-5 ปี)
+- **`eda.py` คำนวณบน `np.int64` จึงปัดเศษแบบ numpy** ซึ่งต่างจาก `round()` ของ Python
+  (9.525 → numpy 9.52, Python 9.53) ใช้ `Engine.roundNp()` เฉพาะ `anomalies.pct`
+- `value_counts()` ของ pandas ใช้ quicksort ค่าที่นับได้เท่ากันจึงสลับลำดับได้
+  ทั้งสองฝั่งจึงเรียงซ้ำด้วย (จำนวนมาก→น้อย, ชื่อค่า)
 - `KEYWORDS['constructor']` ชนกับ `Object.prototype` — `01-expr.js` จึงใช้ `indexOf`
   และเช็ก `hasOwnProperty` ก่อนอ่านคอลัมน์
 

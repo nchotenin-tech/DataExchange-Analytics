@@ -50,7 +50,10 @@ def main() -> int:
                     n = len(service.metric_list(p, t["no"], met, lab))
                     clicks["%s|%s|%s" % (t["no"], met, lab)] = n
 
+        eda = service.eda(p)
         out[pid] = {
+            "eda": clean(eda),
+            "eda_clicks": {},
             "summary": clean(rep["summary"]),
             "districts": clean(rep["districts"]),
             "tables": [{"no": t["no"], "columns": t["columns"],
@@ -61,6 +64,16 @@ def main() -> int:
             "failed_cols": [c for c in fail.columns if c != "_bad"],
             "clicks": clicks,
         }
+        # ยอดคลิกจากการ์ด/แท่งกราฟในหน้าสำรวจข้อมูล
+        for card in eda["numeric"][:6]:
+            for sel in ("outlier", "zero", "neg", "extreme", "iqr"):
+                n = len(service.value_list(p, card["column"], sel))
+                out[pid]["eda_clicks"]["%s|%s" % (card["column"], sel)] = n
+            for bi, h in enumerate(card["hist"][:2]):
+                n = len(service.value_list(p, card["column"], "range",
+                                           lo=h["from"], hi=h["to"], hi_exclusive=True))
+                out[pid]["eda_clicks"]["%s|range|%d" % (card["column"], bi)] = n
+
         print("%s | ยังไม่ตรวจ %d | ไม่ผ่านเกณฑ์ %d | ช่องที่สุ่มตรวจ %d"
               % (pid, len(pend), len(fail), len(clicks)))
 

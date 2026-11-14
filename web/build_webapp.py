@@ -14,7 +14,7 @@
     - ใส่ Content-Security-Policy ปิดการต่อเน็ตทั้งหมด (connect-src 'none')
     - เปลี่ยน api() จากยิงไป Flask เป็นคำนวณในเครื่อง
     - เปลี่ยนลิงก์ดาวน์โหลดเป็นการสร้างไฟล์ในเบราว์เซอร์
-    - ตัดแท็บสำรวจข้อมูล (EDA) และแท็บถาม-ตอบ (AI) ออก
+    - ตัดแท็บถาม-ตอบ (AI) ออก (แท็บสำรวจข้อมูล EDA ยังอยู่ครบ)
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ except Exception:
     pass
 
 SRC_FILES = ["00-xlsx.js", "01-expr.js", "02-data.js", "03-engine.js",
-             "04-service.js", "05-yaml.js", "06-save.js", "07-app.js"]
+             "04-service.js", "05-yaml.js", "06-save.js", "08-eda.js", "07-app.js"]
 
 CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
        "img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'")
@@ -132,15 +132,17 @@ def patch_dashboard(html: str) -> str:
   return await window.DX.api(path);          // คำนวณในเครื่อง ไม่มีการต่อเน็ต
 }""")
 
-    # ---- แท็บ EDA และถาม-ตอบ ----
+    # ---- คงแท็บสำรวจข้อมูล (EDA) ไว้ ตัดเฉพาะแท็บถาม-ตอบ (AI) ----
     html = html.replace(
         """      .concat([{id: 'eda', label: '🔍 สำรวจข้อมูล', sub: 'คุณภาพ · การกระจาย'},
                {id: 'ask', label: '💬 ถาม-ตอบ', sub: 'พิมพ์คำถามเป็นภาษาสนทนา'}]);""",
-        "      ;")
+        """      .concat([{id: 'eda', label: '🔍 สำรวจข้อมูล', sub: 'คุณภาพ · การกระจาย'}]);""")
     html = html.replace("""      '<div class="pane" data-tab="eda" hidden></div>' +
-      '<div class="pane" data-tab="ask" hidden></div>';""", "      '';")
+      '<div class="pane" data-tab="ask" hidden></div>';""",
+        """      '<div class="pane" data-tab="eda" hidden></div>';""")
     html = html.replace("""  if (id === 'eda') loadEda();      // คำนวณตอนเปิดแท็บครั้งแรกเท่านั้น
-  if (id === 'ask') loadAsk();""", "")
+  if (id === 'ask') loadAsk();""",
+        """  if (id === 'eda') loadEda();      // คำนวณตอนเปิดแท็บครั้งแรกเท่านั้น""")
 
     # ---- ปุ่มส่งออก: จากลิงก์ไป Flask เป็นสร้างไฟล์ในเบราว์เซอร์ ----
     html = html.replace("""  return `<span class="xp">
@@ -176,9 +178,7 @@ def patch_dashboard(html: str) -> str:
     html = cut(html, "// เตือนถ้าหน้าเว็บที่เปิดอยู่เก่ากว่าที่เซิร์ฟเวอร์มี",
                "const fmt =", "ตัวเช็ครุ่นกับเซิร์ฟเวอร์")
 
-    # ---- โค้ดของแท็บ EDA / ถาม-ตอบ ----
-    html = cut(html, "function edaAnomalies(", "// ---------- แท็บถาม-ตอบ ----------",
-               "โค้ดแท็บสำรวจข้อมูล (EDA)")
+    # ---- ตัดเฉพาะโค้ดแท็บถาม-ตอบ (AI) — โค้ด EDA เก็บไว้ ----
     html = cut(html, "// ---------- แท็บถาม-ตอบ ----------", "// ---------- แท็บรายงาน ----------",
                "โค้ดแท็บถาม-ตอบ")
 
@@ -360,6 +360,7 @@ def main() -> int:
     html = patch_dashboard(html)
 
     profiles = load_profiles()
+    dictionary = read_any(os.path.join(ROOT, "reference", "dentalfile.csv"))
     hospitals = pack_hospitals(os.path.join(ROOT, "reference", "hospitals.csv"))
     hosp_json = json.dumps(hospitals, ensure_ascii=False)
     print("ฝัง profile %d ไฟล์, หน่วยบริการ %d แห่ง (%.0f KB)"
@@ -373,9 +374,11 @@ def main() -> int:
 
     embed = (
         '<script type="application/json" id="embedded-profiles">%s</script>\n'
-        '<script type="application/json" id="embedded-hospitals">%s</script>'
+        '<script type="application/json" id="embedded-hospitals">%s</script>\n'
+        '<script type="text/plain" id="embedded-dictionary">%s</script>'
         % (json.dumps(profiles, ensure_ascii=False).replace("</", "<\\/"),
-           hosp_json.replace("</", "<\\/"))
+           hosp_json.replace("</", "<\\/"),
+           dictionary.replace("</", "<\\/"))
     )
 
     # สคริปต์ของเราต้องมาก่อนสคริปต์หน้า dashboard เดิม

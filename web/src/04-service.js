@@ -522,6 +522,7 @@
     overviewSpec: overviewSpec, byDistrict: byDistrict, byUnit: byUnit,
     report: report, personList: personList, metricList: metricList,
     personColumnGroups: personColumnGroups, PERSON_KINDS: PERSON_KINDS,
+    addPersonFields: addPersonFields, select: select, badFirst: badFirst,
     rawColumns: rawColumns, fmtDate: fmtDate
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
