@@ -1,0 +1,166 @@
+name: Build เว็บแอป + ทดสอบเทียบผล
+
+# แก้ profiles/*.yaml หรือโค้ดแล้ว push เข้า main -> build + ทดสอบให้อัตโนมัติ
+# โหลดไฟล์ได้จากแท็บ Actions > ชิ้นงาน (Artifacts) ไม่ต้องรอปล่อยเวอร์ชัน
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# โปรเจกต์นี้มีข้อความไทยเยอะ ต้องบังคับ UTF-8 ทุก step
+env:
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: 'utf-8'
+
+jobs:
+  webapp:
+    name: เว็บแอป (HTML ไฟล์เดียว)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: ติดตั้งไลบรารี
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          cd web && npm install --no-audit --no-fund
+
+      - name: สร้างข้อมูลตัวอย่าง (สมมติทั้งหมด ไม่ใช่ข้อมูลคนจริง)
+        run: python web/make_test_data.py /tmp/sample --rows 4000
+
+      - name: คำนวณด้วยโปรแกรมเดิม (Python) เก็บไว้เป็นค่าอ้างอิง
+        env:
+          DENTALDX_DATA: /tmp/sample
+        run: python web/dump_python_ref.py /tmp/python_ref.json
+
+      - name: ทดสอบเทียบผล — ตัวเลขฝั่งเว็บต้องตรงกับ Python ทุกค่า
+        run: node web/parity_test.mjs /tmp/sample profiles reference/hospitals.csv /tmp/python_ref.json
+
+      - name: ทดสอบค่าผิดรูปแบบและไฟล์ขนาดใหญ่
+        run: |
+          python web/make_test_data.py /tmp/big --rows 40 --big 100000
+          BIG_XLSX=/tmp/big/big/"sample big.xlsx" node web/edge_test.mjs
+
+      - name: ทดสอบของเดิมไม่พัง
+        run: python tools/smoke_test.py
+
+      - name: สร้างเว็บแอปไฟล์เดียว
+        run: python web/build_webapp.py
+
+      - name: ทดสอบไฟล์ที่ build แล้วด้วยข้อมูลตัวอย่าง
+        env:
+          DX_DATA: /tmp/sample
+        run: cd web && node browser_test.mjs
+
+      - name: สร้าง zip สำหรับแจกจ่าย
+        run: python web/make_package.py
+
+      - name: ตรวจว่าไม่มีข้อมูลผู้ป่วยติดไปกับไฟล์แจกจ่าย
+        run: |
+          python - <<'EOF'
+          import glob, zipfile, sys
+          bad = []
+          for z in glob.glob('dist/*.zip'):
+              for n in zipfile.ZipFile(z).namelist():
+                  if n.lower().endswith(('.xlsx', '.xls', '.csv')):
+                      bad.append(z + ' -> ' + n)
+          if bad:
+              print('พบไฟล์ข้อมูลในแพ็กเกจ:', *bad, sep='\n  ')
+              sys.exit(1)
+          print('ตรวจแล้ว: ไม่มีไฟล์ข้อมูลในแพ็กเกจ')
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DentalDX-webapp
+          path: |
+            dist/*.html
+            dist/*.zip
+          retention-days: 30
+
+  exe:
+    name: โปรแกรม .exe (ทางสำรอง)
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: ติดตั้งไลบรารี
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: ทดสอบก่อน build
+        run: python tools/smoke_test.py
+
+      - name: Build EXE
+        run: pyinstaller DentalDX.spec --noconfirm --clean
+
+      - name: Read version
+        id: ver
+        shell: bash
+        run: echo "version=$(python tools/version.py)" >> $GITHUB_OUTPUT
+
+      - name: จัดแพ็กเกจ .exe
+        shell: pwsh
+        run: |
+          $out = "package/DentalDX"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Move-Item dist/DentalDX.exe $out/
+          Copy-Item -Recurse profiles  $out/profiles
+          Copy-Item -Recurse reference $out/reference
+          Copy-Item -Recurse docs      $out/docs
+          Copy-Item README.md          $out/
+          Get-ChildItem "$out/docs" -Filter *.md |
+            Where-Object { Select-String -Path $_.FullName -Pattern 'internal-doc' -Quiet } |
+            ForEach-Object { Remove-Item $_.FullName -Force }
+          Get-ChildItem "$out/docs" -Filter *.txt | Move-Item -Destination $out -Force
+          python tools/make_data_dirs.py $out
+          Compress-Archive -Path $out -DestinationPath `
+            "DentalDX-exe-v${{ steps.ver.outputs.version }}-win64.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DentalDX-exe
+          path: DentalDX-exe-v${{ steps.ver.outputs.version }}-win64.zip
+          retention-days: 30
+
+  release:
+    name: สร้าง Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [webapp, exe]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with: {name: DentalDX-webapp, path: rel}
+      - uses: actions/download-artifact@v4
+        with: {name: DentalDX-exe, path: rel}
+
+      - name: รายการไฟล์ที่จะแนบ
+        run: ls -la rel/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: rel/*
+          generate_release_notes: true
+          body_path: .github/release_notes.md

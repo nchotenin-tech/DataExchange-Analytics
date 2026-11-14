@@ -1,0 +1,14 @@
+{
+  "name": "dentaldx-webapp-tests",
+  "private": true,
+  "type": "module",
+  "description": "สคริปต์ทดสอบเว็บแอป (ตัวโปรแกรมจริงไม่ใช้ไลบรารีภายนอกเลย)",
+  "scripts": {
+    "parity": "node parity_test.mjs ../data ../profiles ../reference/hospitals.csv ../python_ref.json",
+    "edge": "node edge_test.mjs",
+    "browser": "node browser_test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

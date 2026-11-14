@@ -44,3 +44,7 @@ package/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# ไลบรารีสำหรับสคริปต์ทดสอบเท่านั้น (ตัวโปรแกรมไม่ใช้)
+node_modules/
+dist/
