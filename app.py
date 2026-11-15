@@ -1,4 +1,4 @@
-"""DentalDX — เว็บแอปวิเคราะห์ข้อมูล Data Exchange สภาวะทันตสุขภาพ
+"""DentalDX — รายงานการตรวจฟันในเด็ก 0-12 ปี (HDC Data Exchange)
 
 รันแบบ dev :  python app.py
 รันแบบ exe  :  DentalDX.exe   (เปิดเบราว์เซอร์อัตโนมัติ)

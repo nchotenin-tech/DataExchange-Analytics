@@ -190,7 +190,7 @@ def patch_dashboard(html: str) -> str:
 PICKER = """
 <div id="pick" class="pick">
   <div class="pickbox">
-    <h1>DentalDX — รายงานสภาวะทันตสุขภาพเด็ก</h1>
+    <h1>DentalDX — รายงานการตรวจฟันในเด็ก 0-12 ปี</h1>
     <p class="sub">เวอร์ชัน __VERSION__ · ทำงานในเบราว์เซอร์ทั้งหมด</p>
 
     <div class="lock">
