@@ -45,7 +45,7 @@ jobs:
           node --version
 
       - name: สร้างข้อมูลตัวอย่าง (สมมติทั้งหมด ไม่ใช่ข้อมูลคนจริง)
-        run: python web/make_test_data.py /tmp/sample --rows 4000
+        run: python web/make_test_data.py /tmp/sample --rows 4000 --clean
 
       - name: คำนวณด้วยโปรแกรมเดิม (Python) เก็บไว้เป็นค่าอ้างอิง
         env:

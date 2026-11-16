@@ -119,20 +119,28 @@ def main() -> int:
     ap.add_argument("--rows", type=int, default=4000)
     ap.add_argument("--big", type=int, default=0,
                     help="สร้างไฟล์ใหญ่กี่แถว (0 = ไม่สร้าง)")
+    ap.add_argument("--clean", action="store_true",
+                    help="ไม่ใส่ค่าผิดรูปแบบ — ใช้กับการเทียบผลกับ Python\n"
+                         "(pandas แต่ละเวอร์ชันตีความค่าที่เป็นไปไม่ได้ไม่เหมือนกัน\n"
+                         " เช่นปี พ.ศ. 2564 บางเวอร์ชันอ่านได้ บางเวอร์ชันเป็นค่าว่าง\n"
+                         " ถ้าปนมาในข้อมูลเทียบผล จะล้มเพราะเวอร์ชันไลบรารี ไม่ใช่เพราะโค้ดผิด)")
     a = ap.parse_args()
     rnd = random.Random(7)
 
     print("สร้างข้อมูลตัวอย่าง (สมมติทั้งหมด):")
     g1 = [row(i, i % 3, rnd, False) for i in range(a.rows)]
-    add_edge_cases(g1)
+    if not a.clean:
+        add_edge_cases(g1)
     write(os.path.join(a.dest, "0-5y", "sample 0-2.xlsx"), g1)
 
     g2 = [row(i + a.rows, 3 + i % 3, rnd, False) for i in range(a.rows)]
-    add_edge_cases(g2)
+    if not a.clean:
+        add_edge_cases(g2)
     write(os.path.join(a.dest, "0-5y", "sample 3-5.xlsx"), g2)
 
     g3 = [row(i, 6 + i % 7, rnd, True) for i in range(a.rows)]
-    add_edge_cases(g3)
+    if not a.clean:
+        add_edge_cases(g3)
     write(os.path.join(a.dest, "6-12y", "sample 6-12.xlsx"), g3)
 
     if a.big:

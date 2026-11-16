@@ -189,7 +189,10 @@
       rules.push({name: r.name, desc: r.desc, count: cnt,
                   pct: n ? round2(100 * cnt / n) : null});
     });
-    rules.sort(function (a, b) { return b.count - a.count; });
+    // จำนวนเท่ากันให้เรียงตามชื่อ ลำดับจะได้คงที่ทุกครั้ง
+    rules.sort(function (a, b) {
+      return b.count - a.count || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
     var bad = 0;
     for (var i = 0; i < n; i++) if (anyBad[i]) bad++;
     // ฝั่ง Python ค่านี้คำนวณบน np.int64 จึงปัดเศษแบบ numpy (ดู Engine.roundNp)

@@ -173,7 +173,8 @@ def anomalies(df: pd.DataFrame, profile) -> dict:
             "name": name, "desc": desc, "count": cnt,
             "pct": round(100 * cnt / n, 2) if n else None,
         })
-    rules.sort(key=lambda r: -r["count"])
+    # จำนวนเท่ากันให้เรียงตามชื่อ ลำดับจะได้คงที่ทุกครั้ง
+    rules.sort(key=lambda r: (-r["count"], r["name"]))
     return {
         "rules": rules,
         "rows_with_issue": int(any_bad.sum()),
