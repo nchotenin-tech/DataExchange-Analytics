@@ -39,6 +39,11 @@ jobs:
           pip install -r requirements.txt
           cd web && npm install --no-audit --no-fund
 
+      - name: เวอร์ชันที่ใช้จริงบน runner
+        run: |
+          python -c "import sys,pandas,numpy,openpyxl,yaml;print('python',sys.version.split()[0]);print('pandas',pandas.__version__,'numpy',numpy.__version__,'openpyxl',openpyxl.__version__,'yaml',yaml.__version__)"
+          node --version
+
       - name: สร้างข้อมูลตัวอย่าง (สมมติทั้งหมด ไม่ใช่ข้อมูลคนจริง)
         run: python web/make_test_data.py /tmp/sample --rows 4000
 
@@ -53,7 +58,7 @@ jobs:
       - name: ทดสอบค่าผิดรูปแบบและไฟล์ขนาดใหญ่
         run: |
           python web/make_test_data.py /tmp/big --rows 40 --big 100000
-          BIG_XLSX=/tmp/big/big/"sample big.xlsx" node web/edge_test.mjs
+          BIG_XLSX="/tmp/big/big/sample big.xlsx" node web/edge_test.mjs
 
       - name: ทดสอบของเดิมไม่พัง
         run: python tools/smoke_test.py
@@ -83,6 +88,16 @@ jobs:
               sys.exit(1)
           print('ตรวจแล้ว: ไม่มีไฟล์ข้อมูลในแพ็กเกจ')
           EOF
+
+      - name: เก็บไฟล์ไว้ตรวจเมื่อทดสอบไม่ผ่าน
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-debug
+          path: |
+            /tmp/python_ref.json
+            /tmp/sample
+          retention-days: 7
 
       - uses: actions/upload-artifact@v4
         with:

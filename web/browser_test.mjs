@@ -144,7 +144,10 @@ console.log('  มีข้อมูลรายบุคคลปนไหม:'
 /* ---- แท็บสำรวจข้อมูล (EDA) ---- */
 const edaBtn=[...w.document.querySelectorAll('button.tab')]
   .find(b=>b.querySelector('b').textContent.includes('สำรวจข้อมูล'));
+let FAIL = 0;
+const must = (ok, what) => { if (!ok) { FAIL++; console.log('  ✗ ' + what); } };
 console.log('\nแท็บสำรวจข้อมูล:', edaBtn? 'มี':'ไม่มี');
+must(!!edaBtn, 'ไม่พบแท็บสำรวจข้อมูล');
 if(edaBtn){
   edaBtn.onclick(); await new Promise(r=>setTimeout(r,1500));
   const ep=$('.pane[data-tab=eda]');
@@ -157,3 +160,17 @@ if(edaBtn){
   if(card){ card.click(); await new Promise(r=>setTimeout(r,600));
     console.log('  คลิกการ์ด -> รายชื่อ:', w.document.querySelectorAll('.mbody tbody tr').length,'แถว'); }
 }
+
+/* ---- สรุปผลแล้วปิดให้เรียบร้อย ----
+   jsdom ทิ้ง timer ของหน้าเว็บค้างไว้ ถ้าไม่ปิดเอง โปรเซสจะไม่จบ
+   แล้ว CI จะแฮงก์จนหมดเวลา (เคยทำให้ workflow ล้มมาแล้ว) */
+must(!$('#pick'), 'หน้าเลือกโฟลเดอร์ไม่ถูกเอาออกหลังโหลดข้อมูล');
+must(w.document.querySelectorAll('.pane[data-tab=overview] tbody tr').length > 0,
+     'ตารางภาพรวมว่าง');
+must(saved && (saved.size || saved.length) > 0, 'กดบันทึกรายงานแล้วไม่ได้ไฟล์');
+must(last && last.summary && !/cid|เลขบัตร|lname/.test(JSON.stringify(last)),
+     'สิ่งที่เบราว์เซอร์จำไว้มีข้อมูลรายบุคคลปนอยู่');
+
+console.log(FAIL ? `\nไม่ผ่าน ${FAIL} ข้อ` : '\nผ่านหมด');
+try { w.close(); } catch (e) { /* ไม่เป็นไร */ }
+process.exit(FAIL ? 1 : 0);
