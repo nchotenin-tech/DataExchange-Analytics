@@ -63,7 +63,7 @@ data\0-5y\dataexchange ตรวจฟันเด็ก 3-5 ปี.xlsx
 
 ต้องใช้ **Chrome หรือ Edge** — Firefox ยังเลือกทั้งโฟลเดอร์ไม่ได้
 
-<details><summary>วิธีใช้แบบเดิม (.exe) ซึ่งยังแจกเป็นทางสำรอง</summary>
+<details><summary>วิธีใช้แบบเดิม (.exe) — ไม่แจกในหน้า Release แล้ว ยังสร้างไว้ที่แท็บ Actions &gt; Artifacts</summary>
 
 
 **ดับเบิลคลิก `DentalDX.exe`**

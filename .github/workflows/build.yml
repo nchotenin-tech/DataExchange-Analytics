@@ -162,14 +162,14 @@ jobs:
   release:
     name: สร้าง Release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [webapp, exe]
+    # ไม่รอ job .exe และไม่แนบ .exe ในหน้า Release — Windows 11 บล็อก
+    # ใครจำเป็นต้องใช้จริง ๆ โหลดได้จากแท็บ Actions > Artifacts
+    needs: [webapp]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with: {name: DentalDX-webapp, path: rel}
-      - uses: actions/download-artifact@v4
-        with: {name: DentalDX-exe, path: rel}
 
       - name: รายการไฟล์ที่จะแนบ
         run: ls -la rel/
