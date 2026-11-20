@@ -59,8 +59,16 @@ if not errorlevel 1 (
 del "%TEMP%\dx_tracked.txt" >nul 2>&1
 echo     OK - no data files tracked.
 
+rem git must never wait for a hidden login window - fail fast instead
+set GIT_TERMINAL_PROMPT=0
+
 rem ---------- 4. run tests ----------
-echo [2/5] Running smoke test...
+rem "release.bat fast" skips this - GitHub Actions runs the same test anyway
+if /i "%~1"=="fast" (
+    echo [2/5] Skipping smoke test ^(fast mode^) - Actions will still run it.
+    goto aftertest
+)
+echo [2/5] Running smoke test... takes about 1 minute, started %TIME:~0,8%
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 %PY% tools\smoke_test.py
@@ -71,6 +79,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:aftertest
 rem ---------- 5. commit + push ----------
 echo [3/5] Committing changes...
 git add -A
@@ -100,8 +109,8 @@ for /f "delims=" %%L in ('git status --porcelain') do (
 )
 
 echo [4/5] Pushing to GitHub...
-git push
-if errorlevel 1 goto err
+git push --verbose
+if errorlevel 1 goto pusherr
 
 rem ---------- 6. tag ----------
 echo [5/5] Tagging v%VER% ...
@@ -141,8 +150,8 @@ echo   OK - GitHub has the same code as this machine.
 
 echo.
 echo ============================================================
-echo   DONE. GitHub Actions is building the EXE now.
-echo   Takes about 5 minutes.
+echo   DONE. GitHub Actions is building the web app now.
+echo   Takes about 2-3 minutes.
 echo ============================================================
 echo.
 echo Opening the Actions page...
@@ -158,5 +167,19 @@ exit /b 0
 echo.
 echo *** FAILED - see messages above ***
 echo If push was rejected, run:  git pull --rebase   then try again.
+pause
+exit /b 1
+
+:pusherr
+echo.
+echo *** PUSH FAILED ***
+echo.
+echo If it says "could not read Username" or "Authentication failed",
+echo git has no saved login for GitHub. Fix it once with:
+echo.
+echo     winget install --id GitHub.cli
+echo     gh auth login        (choose GitHub.com - HTTPS - login with a browser)
+echo.
+echo If it says "rejected", run:  git pull --rebase    then run this again.
 pause
 exit /b 1
